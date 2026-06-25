@@ -37,7 +37,23 @@ def _save_json_file(path: str, data):
     try:
         with open(temp_path, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
-        os.replace(temp_path, path)
+        try:
+            os.replace(temp_path, path)
+        except PermissionError:
+            # Windows 文件可能被短暂占用，兜底直接重写主文件，避免启动失败.
+            try:
+                with open(path, "w", encoding="utf-8") as f:
+                    json.dump(data, f, ensure_ascii=False, indent=2)
+            except PermissionError:
+                # make write possible when readonly flag exists in certain environments
+                try:
+                    os.chmod(path, 0o666)
+                    with open(path, "w", encoding="utf-8") as f:
+                        json.dump(data, f, ensure_ascii=False, indent=2)
+                except Exception as e:
+                    raise PermissionError(
+                        f"failed to persist data file {path}: {e}"
+                    ) from e
     finally:
         if os.path.exists(temp_path):
             try:
