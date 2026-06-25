@@ -58,9 +58,14 @@ def _save(data: dict):
 
 
 def _trim(items: list[dict]) -> list[dict]:
-    if len(items) <= MAX_QUOTES_PER_GROUP:
+    if len(items) < MAX_QUOTES_PER_GROUP:
         return items
-    return items[-MAX_QUOTES_PER_GROUP:]
+    if not items:
+        return items
+
+    # 满500条时随机移除一条，再保留最新插入机会
+    idx = random.randrange(len(items))
+    return items[:idx] + items[idx + 1 :]
 
 
 async def add_quote(group_id: str, user_id: str, user_name: str, text: str):
