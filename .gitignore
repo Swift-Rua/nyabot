@@ -10,7 +10,6 @@ dist/
 .env.prod
 .DS_Store
 *.log
-
 data/setu/
 data/stickers/
-data/voice/
+data/voice/
