@@ -34,6 +34,44 @@ _ERR_FALLBACKS = (
     "有些消息没拉齐，我先给你一个稳定结论。",
 )
 _LAST_ERR_FALLBACK = None
+_LAST_AI_STATUS = "ok"
+
+
+def _set_ai_status(status: str):
+    """Cache last AI call status for fallback routing."""
+    global _LAST_AI_STATUS
+    _LAST_AI_STATUS = (status or "ok").strip().lower()
+
+
+def was_last_ai_call_no_tokens() -> bool:
+    """Whether last AI request failed because of likely token/quota issues."""
+    return _LAST_AI_STATUS == "no_tokens"
+
+
+def _classify_ai_error(error: Exception) -> str:
+    msg = str(error).lower()
+
+    status = getattr(error, "status_code", None)
+    if status in (402,):
+        return "no_tokens"
+    if status in (429,):
+        # quota/limit related network-level throttling
+        return "no_tokens"
+
+    if any(
+        keyword in msg
+        for keyword in (
+            "insufficient_quota",
+            "insufficient credits",
+            "quota",
+            "token",
+            "exceeded your current quota",
+            "billing",
+        )
+    ):
+        return "no_tokens"
+
+    return "error"
 
 
 def _fallback_reply() -> str:
@@ -196,10 +234,12 @@ async def ask_ai(
 
     if not os.getenv("DEEPSEEK_API_KEY"):
         print("[AI] missing DEEPSEEK_API_KEY")
+        _set_ai_status("no_tokens")
         return _fallback_reply()
 
     if not os.getenv("DEEPSEEK_BASE_URL"):
         print("[AI] missing DEEPSEEK_BASE_URL")
+        _set_ai_status("no_tokens")
         return _fallback_reply()
 
     # 世界观上下文
@@ -259,7 +299,9 @@ async def ask_ai(
             temperature=1.1,
         )
         reply = (response.choices[0].message.content or "").strip()
+        _set_ai_status("ok")
         return reply or _fallback_reply()
     except Exception as e:
+        _set_ai_status(_classify_ai_error(e))
         print(f"[AI] deepseek ask failed: {type(e).__name__}: {e}")
         return _fallback_reply()

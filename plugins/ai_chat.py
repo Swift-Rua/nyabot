@@ -19,9 +19,10 @@ from services.ai_gate import AIGate
 from services.context_compressor import record_message
 from services.data_store import get_group_name, get_user_sync
 from services.deepseek_client import _fallback_reply as _deep_fallback_reply
-from services.deepseek_client import ask_ai
+from services.deepseek_client import ask_ai, was_last_ai_call_no_tokens
 from services.group_reply_policy import get_group_default_reply_prob
 from services.mention_resolver import parse_at_from_event, resolve_mentions
+from services.group_quotes import add_quote, get_random_quote
 from services.mood import get as get_mood, update as update_mood
 from services.nya_personality import learn_catchphrase, record_chat as nya_record
 from services.persona_guard import check as persona_check
@@ -104,6 +105,11 @@ async def _safe_ask(text, user_id, group_id, user_name, mentioned_ids, mood, max
             mentioned_ids=mentioned_ids,
             mood_state=mood,
         )
+        if was_last_ai_call_no_tokens() and group_id:
+            quote = await get_random_quote(group_id)
+            if quote:
+                return quote
+
         reply = _normalize_text(reply)
 
         for _ in range(max_try):
@@ -263,6 +269,7 @@ async def _(event: GroupMessageEvent):
 
     at_ids, display_text = parse_at_from_event(event)
     text = _normalize_text(display_text or event.get_plaintext())
+    raw_text = text
     user_name = _get_name(user_id)
 
     sticker_info = sticker_detect(event)
@@ -279,6 +286,8 @@ async def _(event: GroupMessageEvent):
         await record_member(group_id, user_id, group_name or getattr(event, "group_name", None))
         await updater.ensure_user(user_id)
         await updater.auto_profile(user_id, text)
+    if not is_noise(raw_text) and not _is_control_command(raw_text):
+        await add_quote(group_id, user_id, user_name, raw_text)
 
     record_message(group_id, user_name, text)
     gate.set_group_default_prob(group_id, get_group_default_reply_prob(group_id, DEFAULT_REPLY_PROB))
