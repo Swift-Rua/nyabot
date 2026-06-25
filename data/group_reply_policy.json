@@ -1,0 +1,10 @@
+{
+  "groups": {
+    "925046219": {
+      "default_reply_prob": 0.2
+    },
+    "927717407": {
+      "default_reply_prob": 0.05
+    }
+  }
+}

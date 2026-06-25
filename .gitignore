@@ -1,0 +1,16 @@
+.venv/
+__pycache__/
+.pytest_cache/
+*.py[cod]
+*.so
+.Python
+build/
+dist/
+.env
+.env.prod
+.DS_Store
+*.log
+
+data/setu/
+data/stickers/
+data/voice/
