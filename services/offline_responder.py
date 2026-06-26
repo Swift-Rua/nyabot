@@ -1,10 +1,12 @@
-"""Offline no-token response helpers."""
+﻿"""Offline no-token response helpers."""
 
 from __future__ import annotations
 
 import json
 import os
 import random
+import re
+from difflib import SequenceMatcher
 
 from services.message_logger import (
     fetch_recent_messages,
@@ -17,9 +19,11 @@ from services.message_logger import (
     get_user_words,
 )
 from services.meme_bank import get_random_meme
+from services.group_quotes import get_quotes as get_group_quotes
 from services.reply_chain import get_reply_chain
 from services.relation import get_top_friends, get_top_rivals
 from services.data_store import get_users_sync
+from services.face_learning import get_random_face_token
 from services.mood_profile import get_context as get_mood_context
 from services.time_profile import get_context as get_time_context
 from services.utils import clean_text
@@ -27,18 +31,17 @@ from services.utils import clean_text
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TEMPLATES_FILE = os.path.join(BASE_DIR, "data", "templates.json")
-
 _DEFAULT_TEMPLATES = [
-    "{speaker} 的发言在最近 {active_days} 天里比较稳定，当前互动强度 {message_count}。",
-    "{speaker} 最近常提到“{topic}”，最近一个热点方向是 {top_word}。",
-    "看起来这个群里 {best_friend} 最近互动很频繁，{speaker} 的回复节奏也不错。",
-    "系统观测：{speaker} 在 {active_hour} 点最活跃，最近平均长度 {average_length} 字。",
-    "无token 下的回退回复：{speaker} 给出的线索是“{topic}”，你也可以接着聊这个方向。",
-    "你们最近最热的话题是 {top_words}，{speaker} 可以重点接话。",
-    "{speaker} 的热词是 {top_word}，你也可以顺着这个方向回应。",
+    "{speaker} 这段时间发言了 {active_days} 天，最近比较稳，发了 {message_count} 条消息，状态挺带感。",
+    "{speaker} 刚刚提到了 {topic}，我猜你会觉得 {top_word} 这个词很有共鸣。",
+    "{speaker} 这位朋友 {best_friend} 最近总能在话题上有很准的回应。",
+    "{speaker} 按活跃时间看，{active_hour} 点大家都比较热闹，平均发言长度约 {average_length} 字。",
+    "{speaker} 这个时间点常见主题是 {topic}，也许你会想接着说这句。",
+    "{speaker} 最近常出现 {top_words}，你可以接个梗玩起来。",
+    "{speaker} 这句里有点像 {top_word} 的感觉，能不能接一句更有趣的。"
 ]
 
-_DEFAULT_STOP_TOPICS = {"这个", "那", "他", "她", "它", "这个人", "你", "我", "大家"}
+_DEFAULT_STOP_TOPICS = {"这个", "那个", "然后", "就是", "好像", "到底", "你们", "而且", "不过"}
 
 _MAX_MARKOV_STEPS = 3
 _MARKOV_POOL = 500
@@ -51,6 +54,10 @@ _MAX_MARKOV_WORDS = 360
 _HISTORY_QUOTE_PROBABILITY = 0.15
 _HISTORY_POOL_SIZE = 500
 _HISTORY_QUOTE_SAMPLE_SIZE = 30
+_NO_TOKEN_FACE_PROBABILITY = 0.25
+_NO_TOKEN_QUOTE_PARTS_MIN = 2
+_NO_TOKEN_QUOTE_PARTS_MAX = 3
+_NO_TOKEN_MAX_REPLY_CHARS = 90
 
 _TOP_WORDS_FOR_CONTEXT = 3
 _TOP_PHRASES_FOR_CONTEXT = 3
@@ -58,17 +65,16 @@ _TOP_FILLERS_FOR_CONTEXT = 3
 _RICH_TEXT_PROB = 0.15
 
 _MOOD_PREPEND = {
-    "low": "（有点累，先说点轻松的）",
-    "medium": "（这波氛围偏平稳）",
-    "high": "（我现在很带感）",
+    "low": "有点困了，先来一句：",
+    "medium": "顺势接话：",
+    "high": "现在氛围很热闹，直接来句：",
 }
 
 _MOOD_APPEND = {
-    "low": "，要不先缓口气？",
-    "medium": "，大家聊得很自在。",
-    "high": "，群里今天很有气氛。",
+    "low": "先别急着回，慢慢想。",
+    "medium": "你看这反应还行。",
+    "high": "今天就靠这一句带节奏。",
 }
-
 
 def _load_templates() -> list[dict[str, object]]:
     if not os.path.exists(TEMPLATES_FILE):
@@ -142,6 +148,25 @@ def _normalize_keyword_list(raw: object) -> list[str]:
         if text:
             out.append(text)
     return out
+
+
+def _compact_for_repeat_check(text: str) -> str:
+    raw = clean_text(text).lower()
+    return re.sub(r"[^\w\u4e00-\u9fff]", "", raw)
+
+
+def _is_redundant_reply(seed: str, reply: str, *, ratio_threshold: float = 0.9) -> bool:
+    src = _compact_for_repeat_check(seed)
+    dst = _compact_for_repeat_check(reply)
+    if not src or not dst:
+        return False
+    if src == dst:
+        return True
+    if len(src) < 6 or len(dst) < 6:
+        return False
+    if abs(len(src) - len(dst)) > max(2, len(src) // 3):
+        return False
+    return SequenceMatcher(None, src, dst).ratio() >= ratio_threshold
 
 
 def _contains_any(text: str, patterns: list[str]) -> bool:
@@ -238,7 +263,7 @@ def _extract_topic(profile: dict | None, recent_msgs: list[str]) -> str:
             for token in tokens:
                 if len(token) >= 2 and token not in _DEFAULT_STOP_TOPICS:
                     return token
-    return "群聊"
+    return "缇よ亰"
 
 
 def _build_top_words(group_id: str | None) -> tuple[str, str, str]:
@@ -505,6 +530,41 @@ def _decorate_emotion_text(reply: str, context: dict[str, str]) -> str:
     return out.strip()
 
 
+def _maybe_append_learned_face(reply: str, group_id: str | None) -> str:
+    if not reply:
+        return reply
+
+    if random.random() > _NO_TOKEN_FACE_PROBABILITY:
+        return reply
+
+    face = get_random_face_token(group_id=group_id, limit=180)
+    if not face:
+        return reply
+
+    if "[CQ:face" in reply:
+        return reply
+
+    if random.random() < 0.7:
+        return f"{reply} {face}".strip()
+    return f"{face} {reply}".strip()
+
+
+def _finalize_reply(
+    reply: str | None,
+    *,
+    group_id: str | None,
+    context: dict[str, str],
+    seed: str | None = None,
+    enable_rich_text: bool = True,
+) -> str | None:
+    if not reply:
+        return None
+    if seed and _is_redundant_reply(seed, reply):
+        return None
+    text = _decorate_emotion_text(reply, context) if enable_rich_text else reply
+    return _maybe_append_learned_face(text, group_id=group_id)
+
+
 def _pick_reply_chain(group_id: str | None, seed: str | None) -> str | None:
     if not seed:
         return None
@@ -551,12 +611,104 @@ def _pick_history_quote(group_id: str | None, seed: str | None = None) -> str | 
     return quote or None
 
 
+def _pick_quote_bank(group_id: str | None, seed: str | None = None) -> str | None:
+    quotes = get_group_quotes(group_id=group_id, seed=seed, limit=_NO_TOKEN_QUOTE_PARTS_MAX * 2)
+    if not quotes and seed:
+        quotes = get_group_quotes(group_id=group_id, seed=None, limit=_NO_TOKEN_QUOTE_PARTS_MAX * 2)
+    if not quotes:
+        return None
+
+    return _join_quote_fragments(quotes, seed=seed)
+
+
+def _pick_history_quote_bank(group_id: str | None, seed: str | None = None) -> list[str]:
+    if random.random() > _HISTORY_QUOTE_PROBABILITY:
+        return []
+    if not group_id:
+        return []
+
+    normalized_seed = clean_text(seed or "").strip()
+    rows: list[dict[str, object]] = []
+    if normalized_seed:
+        rows = get_messages_by_keyword(
+            group_id=group_id,
+            keyword=normalized_seed,
+            pool_size=_HISTORY_POOL_SIZE,
+            limit=_HISTORY_QUOTE_SAMPLE_SIZE,
+        ) or []
+
+    if not rows:
+        rows = get_message_pool(group_id=group_id, pool_size=_HISTORY_POOL_SIZE) or []
+    if not rows:
+        return []
+
+    raw_quotes = [_safe_value(random.choice(rows).get("message"))]
+    for _ in range(_NO_TOKEN_QUOTE_PARTS_MAX - 1):
+        item = random.choice(rows)
+        quote = _safe_value(item.get("message"))
+        if quote:
+            raw_quotes.append(quote)
+    return raw_quotes
+
+
+def _join_quote_fragments(quotes: list[str], *, seed: str | None = None) -> str | None:
+    if not quotes:
+        return None
+
+    uniq: list[str] = []
+    for q in quotes:
+        text = clean_text(q).strip()
+        if not text:
+            continue
+        if text in uniq:
+            continue
+        if seed and _is_redundant_reply(clean_text(seed), text):
+            continue
+        uniq.append(text)
+
+    if not uniq:
+        return None
+
+    random.shuffle(uniq)
+    max_parts = random.randint(_NO_TOKEN_QUOTE_PARTS_MIN, min(_NO_TOKEN_QUOTE_PARTS_MAX, len(uniq)))
+    picked = uniq[:max_parts]
+
+    parts: list[str] = []
+    current_len = 0
+    seps = ["，", "，", "。", "…", " "]
+    for frag in picked:
+        frag = frag.strip()
+        if not frag:
+            continue
+        if not parts:
+            if len(frag) > _NO_TOKEN_MAX_REPLY_CHARS:
+                frag = frag[: _NO_TOKEN_MAX_REPLY_CHARS]
+            parts.append(frag)
+            current_len = len(frag)
+            continue
+
+        sep = random.choice(seps)
+        add_len = len(sep) + len(frag)
+        if current_len + add_len > _NO_TOKEN_MAX_REPLY_CHARS:
+            break
+        parts.append(f"{sep}{frag}")
+        current_len += add_len
+
+    if not parts:
+        return None
+
+    return "".join(parts)
+
+
 def build_no_token_reply(
     group_id: str | None,
     user_id: str,
     mentioned_ids: list[str] | None = None,
     seed: str | None = None,
     mood_state: dict | None = None,
+    use_rich_text: bool = True,
+    *,
+    only_quotes: bool = False,
 ) -> str | None:
     if mood_state and isinstance(mood_state, dict):
         try:
@@ -569,29 +721,101 @@ def build_no_token_reply(
     recent = _collect_recent_messages(group_id)
     context["topic"] = _build_topic_text(group_id, user_id, seed=seed)
 
-    reply = _pick_reply_chain(group_id, seed)
-    if reply:
-        return _decorate_emotion_text(reply, context)
+    quote = _pick_quote_bank(group_id=group_id, seed=seed)
+    if quote:
+        return _finalize_reply(
+            quote,
+            group_id=group_id,
+            context=context,
+            seed=seed,
+            enable_rich_text=use_rich_text,
+        )
 
-    if seed and _safe_value(context.get("topic")) != "群聊":
+    if not quote and group_id is not None:
+        quote = _pick_quote_bank(group_id=group_id, seed=None)
+        if quote:
+            return _finalize_reply(
+                quote,
+                group_id=group_id,
+                context=context,
+                seed=seed,
+                enable_rich_text=use_rich_text,
+            )
+
+    quote = _join_quote_fragments(_pick_history_quote_bank(group_id=group_id, seed=seed), seed=seed)
+    if quote:
+        return _finalize_reply(
+            quote,
+            group_id=group_id,
+            context=context,
+            seed=seed,
+            enable_rich_text=use_rich_text,
+        )
+
+    if group_id is not None:
+        quote = _pick_quote_bank(group_id=None, seed=seed)
+        if quote:
+            return _finalize_reply(
+                quote,
+                group_id=group_id,
+                context=context,
+                seed=seed,
+                enable_rich_text=use_rich_text,
+            )
+
+    if only_quotes:
+        return None
+
+    if seed and _safe_value(context.get("topic")) != "缇よ亰":
         reply = _pick_reply_chain(group_id, context["topic"])
         if reply:
-            return _decorate_emotion_text(reply, context)
+            return _finalize_reply(
+                reply,
+                group_id=group_id,
+                context=context,
+                seed=seed,
+                enable_rich_text=use_rich_text,
+            )
 
     meme = _pick_meme(group_id, seed)
     if meme:
-        return _decorate_emotion_text(meme, context)
+        return _finalize_reply(
+            meme,
+            group_id=group_id,
+            context=context,
+            seed=seed,
+            enable_rich_text=use_rich_text,
+        )
 
     template = _select_template(context)
     if template and not template.isspace():
-        return _decorate_emotion_text(template, context)
+        return _finalize_reply(
+            template,
+            group_id=group_id,
+            context=context,
+            seed=seed,
+            enable_rich_text=use_rich_text,
+        )
+
+    reply = _pick_reply_chain(group_id, seed)
+    if reply:
+        return _finalize_reply(
+            reply,
+            group_id=group_id,
+            context=context,
+            seed=seed,
+            enable_rich_text=use_rich_text,
+        )
 
     markov = build_markov_reply(group_id=group_id, seed=seed)
     if markov:
-        return _decorate_emotion_text(markov, context)
-
-    quote = _pick_history_quote(group_id, seed=seed)
-    if quote:
-        return _decorate_emotion_text(quote, context)
+        return _finalize_reply(
+            markov,
+            group_id=group_id,
+            context=context,
+            seed=seed,
+            enable_rich_text=use_rich_text,
+        )
 
     return None
+

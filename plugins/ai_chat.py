@@ -1,8 +1,10 @@
 ﻿"""QQ group chat AI plugin."""
 
 import random
+import asyncio
 import time
 import re
+from difflib import SequenceMatcher
 
 from nonebot import get_bot, on_message
 from nonebot.adapters.onebot.v11 import GroupMessageEvent, MessageSegment
@@ -23,12 +25,13 @@ from services.deepseek_client import ask_ai, was_last_ai_call_no_tokens
 from services.group_reply_policy import get_group_default_reply_prob
 from services.offline_responder import build_no_token_reply
 from services.mention_resolver import parse_at_from_event, resolve_mentions
-from services.group_quotes import add_quote, get_random_quote
+from services.group_quotes import add_quote
 from services.mood import get as get_mood, update as update_mood
 from services.nya_personality import learn_catchphrase, record_chat as nya_record
 from services.persona_guard import check as persona_check
 from services.profile_updater import ProfileUpdater
 from services.proactive import record_member
+from services.event_system import on_group_rename, on_user_rename
 from plugins.setu import SETU_COMMANDS
 from services.sticker import (
     collect_from_event,
@@ -37,6 +40,7 @@ from services.sticker import (
     reply_to_sticker,
     reply_with_sticker,
 )
+from services.utils import clean_text
 
 
 chat = on_message(priority=10)
@@ -45,7 +49,10 @@ DEFAULT_REPLY_PROB = 0.2
 SILENT_DURATION_SECONDS = 12 * 60 * 60
 MUTE_CMD = "牛牛喵闭嘴！"
 UNMUTE_CMD = "牛牛喵归来！"
+_BOT_API_TIMEOUT = 8.0
 CALL_KEYWORDS = ("牛牛喵", "猫猫", "喵", "meow", "@牛牛喵")
+TYPING_HABIT_PROBABILITY = 0.45
+TYPING_GAP_TOKENS = ("...", "???", "……")
 
 SYSTEM_HINT = (
     "You are a member in a QQ group, not an AI assistant.",
@@ -66,6 +73,68 @@ def _fallback_reply() -> str:
 
 def _normalize_text(value: object) -> str:
     return "" if value is None else str(value).strip()
+
+
+def _compact_for_repeat_check(text: str) -> str:
+    normalized = clean_text(_normalize_text(text)).lower()
+    if not normalized:
+        return ""
+    return re.sub(r"[^\w\u4e00-\u9fff]", "", normalized)
+
+
+def _is_repetitive_reply(seed: str, reply: str, *, ratio_threshold: float = 0.9) -> bool:
+    source = _compact_for_repeat_check(seed)
+    target = _compact_for_repeat_check(reply)
+    if not source or not target:
+        return False
+    if source == target:
+        return True
+    if len(source) < 6 or len(target) < 6:
+        return False
+    if abs(len(source) - len(target)) > max(2, len(source) // 3):
+        return False
+    return SequenceMatcher(None, source, target).ratio() >= ratio_threshold
+
+
+async def _build_no_token_reply(
+    *,
+    group_id: str | None,
+    user_id: str,
+    seed: str,
+    mentioned_ids: list[str] | None,
+    mood_state: dict | None,
+    disable_rich_text: bool = False,
+    quote_only: bool = False,
+) -> str | None:
+    for _ in range(3):
+        for target_group in (group_id, None):
+            for seed_hint in (seed, None):
+                reply = build_no_token_reply(
+                    group_id=target_group,
+                    user_id=user_id,
+                    mentioned_ids=mentioned_ids,
+                    seed=(seed_hint or None),
+                    mood_state=mood_state,
+                    use_rich_text=not disable_rich_text,
+                    only_quotes=quote_only,
+                )
+                if reply and not _is_repetitive_reply(seed, reply):
+                    return reply
+            if target_group is None:
+                break
+            reply = build_no_token_reply(
+                group_id=None,
+                user_id=user_id,
+                mentioned_ids=mentioned_ids,
+                seed=seed,
+                mood_state=mood_state,
+                use_rich_text=not disable_rich_text,
+                only_quotes=quote_only,
+            )
+            if reply and not _is_repetitive_reply(seed, reply):
+                return reply
+
+    return None
 
 
 def _get_name(user_id: str) -> str:
@@ -95,7 +164,15 @@ def _has_call_keyword(text: str) -> bool:
             return True
     return False
 
-async def _safe_ask(text, user_id, group_id, user_name, mentioned_ids, mood, max_try=2):
+async def _safe_ask(
+    text,
+    user_id,
+    group_id,
+    user_name,
+    mentioned_ids,
+    mood,
+    max_try: int = 2,
+) -> tuple[str, bool]:
     try:
         reply = await ask_ai(
             message=text,
@@ -107,44 +184,45 @@ async def _safe_ask(text, user_id, group_id, user_name, mentioned_ids, mood, max
             mood_state=mood,
         )
         if was_last_ai_call_no_tokens():
-            offline = build_no_token_reply(
+            offline = await _build_no_token_reply(
                 group_id=group_id,
                 user_id=user_id,
-                mentioned_ids=mentioned_ids,
                 seed=text,
+                mentioned_ids=mentioned_ids,
                 mood_state=mood,
+                disable_rich_text=True,
+                quote_only=True,
             )
-            if not offline:
-                offline = build_no_token_reply(
-                    group_id=None,
-                    user_id=user_id,
-                    mentioned_ids=mentioned_ids,
-                    seed=text,
-                    mood_state=mood,
-                )
             if offline:
-                return offline
+                return offline, True
 
-            quote = await get_random_quote()
-            if quote:
-                return quote
-            return _fallback_reply()
+            fallback = _fallback_reply()
+            if _is_repetitive_reply(text, fallback):
+                return f"{fallback} 😹", True
+            return fallback, True
 
         reply = _normalize_text(reply)
 
         for _ in range(max_try):
             try:
                 retry_needed = persona_check(reply)
+                repetitive = _is_repetitive_reply(text, reply)
             except Exception as e:
                 print(f"[persona] check error: {type(e).__name__}: {e}")
                 break
 
-            if not retry_needed:
+            if not retry_needed and not repetitive:
                 break
 
-            print(f"[persona] retry: {retry_needed}")
+            if repetitive:
+                print(f"[reply] retry: repetitive content for seed={text[:30]!r}")
+                hint = "请用不同的话回应，不要重复用户原文。"
+            else:
+                print(f"[persona] retry: {retry_needed}")
+                hint = PERSONA_RETRY_HINT
+
             reply = await ask_ai(
-                message=f"{text}\n\n{PERSONA_RETRY_HINT}",
+                message=f"{text}\n\n{hint}",
                 user_id=user_id,
                 group_id=group_id,
                 sender_name=user_name,
@@ -153,33 +231,51 @@ async def _safe_ask(text, user_id, group_id, user_name, mentioned_ids, mood, max
                 mood_state=mood,
             )
             reply = _normalize_text(reply)
+            if not _is_repetitive_reply(text, reply):
+                break
 
-        return reply or _fallback_reply()
+        if _is_repetitive_reply(text, reply or ""):
+            fallback = _fallback_reply()
+            if _is_repetitive_reply(text, fallback):
+                return f"{fallback} 😹", False
+            return fallback, False
+
+        return (reply or _fallback_reply()), False
     except Exception as e:
         print(f"[AI] ask failed: {type(e).__name__}: {e}")
-        return _fallback_reply()
+        return _fallback_reply(), False
 
 
 async def _resolve_group_name(group_id: str) -> str:
+    cached = ""
     try:
         cached = get_group_name(group_id)
         if cached:
-            return cached
+            pass
     except Exception:
         pass
 
     try:
         bot = get_bot()
-        info = await bot.call_api("get_group_info", group_id=int(group_id))
+        info = await asyncio.wait_for(
+            bot.call_api("get_group_info", group_id=int(group_id)),
+            timeout=_BOT_API_TIMEOUT,
+        )
         if isinstance(info, dict):
             name = str(info.get("group_name") or info.get("groupName") or "").strip()
             if name:
                 from services.data_store import ensure_group_meta
-
+                if cached and cached != name:
+                    on_group_rename(group_id, cached, name)
                 await ensure_group_meta(group_id, name)
                 return name
+            if cached:
+                return cached
     except Exception:
         pass
+
+    if cached:
+        return cached
 
     return ""
 
@@ -220,26 +316,75 @@ async def _send_text_or_voice(group_id: str, text: str):
 
     if group_voice_mode.get(group_id, False):
         try:
-            await send_voice_reply(int(group_id), text)
+            await asyncio.wait_for(
+                send_voice_reply(int(group_id), text),
+                timeout=_BOT_API_TIMEOUT,
+            )
             return
         except Exception as e:
             print(f"[chat] tts send failed, fallback text, group={group_id}, error={type(e).__name__}: {e}")
 
     try:
-        await get_bot().send_group_msg(group_id=int(group_id), message=text)
+        await asyncio.wait_for(
+            get_bot().send_group_msg(group_id=int(group_id), message=text),
+            timeout=_BOT_API_TIMEOUT,
+        )
     except ActionFailed as e:
         print(f"[chat] send text failed (ActionFailed), group={group_id}, message={e}")
     except Exception as e:
         print(f"[chat] send text failed, group={group_id}, error={type(e).__name__}: {e}")
 
 
-async def _send_reply(group_id: str, text: str, event):
+def _build_typing_chunks(text: str) -> list[str]:
+    text = _normalize_text(text)
+    if not text:
+        return []
+
+    if len(text) <= 12:
+        return [text]
+
+    if random.random() > TYPING_HABIT_PROBABILITY:
+        return [text]
+
+    stop_chars = "。！？!?;；:：、，\n"
+    chunks: list[str] = []
+    current: list[str] = []
+    for ch in text:
+        current.append(ch)
+        if ch in stop_chars and len(current) >= 4 and random.random() < 0.9:
+            chunk = "".join(current).strip()
+            if chunk:
+                chunks.append(chunk)
+            current = []
+            if random.random() < 0.4:
+                chunks.append(random.choice(TYPING_GAP_TOKENS))
+
+    tail = "".join(current).strip()
+    if tail:
+        chunks.append(tail)
+
+    if len(chunks) <= 1 and len(text) > 24:
+        cut = max(4, len(text) // 2)
+        fragments = [
+            f"{text[:cut]} {random.choice(TYPING_GAP_TOKENS)}",
+            text[cut:],
+        ]
+        chunks = [frag.strip() for frag in fragments if frag.strip()]
+
+    chunks = [frag for frag in chunks if _normalize_text(frag)]
+    return chunks[:4] or [text]
+
+
+async def _send_reply(group_id: str, text: str, event, *, typing_habit: bool = False, auto_sticker: bool = True):
     st_info = sticker_detect(event)
     if st_info.get("has_sticker") and not event.get_plaintext().strip():
         sticker_seg = reply_to_sticker(event)
         if sticker_seg:
             try:
-                await get_bot().send_group_msg(group_id=int(group_id), message=str(sticker_seg))
+                await asyncio.wait_for(
+                    get_bot().send_group_msg(group_id=int(group_id), message=str(sticker_seg)),
+                    timeout=_BOT_API_TIMEOUT,
+                )
             except ActionFailed as e:
                 print(f"[chat] send sticker failed (ActionFailed), group={group_id}, message={e}")
                 await _send_text_or_voice(group_id, text)
@@ -248,12 +393,40 @@ async def _send_reply(group_id: str, text: str, event):
                 await _send_text_or_voice(group_id, text)
             return
 
-    if random.random() < 0.5:
+    if typing_habit and not group_voice_mode.get(group_id, False) and random.random() < TYPING_HABIT_PROBABILITY:
+        chunks = _build_typing_chunks(text)
+        if len(chunks) > 1:
+            for i, chunk in enumerate(chunks):
+                try:
+                    await asyncio.wait_for(
+                        get_bot().send_group_msg(group_id=int(group_id), message=chunk),
+                        timeout=_BOT_API_TIMEOUT,
+                    )
+                except ActionFailed as e:
+                    print(f"[chat] send split reply failed (ActionFailed), group={group_id}, message={e}")
+                    break
+                except Exception as e:
+                    print(f"[chat] send split reply failed, group={group_id}, error={type(e).__name__}: {e}")
+                    break
+
+                if i < len(chunks) - 1:
+                    await asyncio.sleep(random.uniform(0.4, 1.2))
+            else:
+                return
+
+            # fallback to last attempt for full text
+            await _send_text_or_voice(group_id, text)
+            return
+
+    if auto_sticker and random.random() < 0.5:
         sticker_segment, _ = reply_with_sticker()
         if sticker_segment and not group_voice_mode.get(group_id, False):
             full_msg = MessageSegment.text(text) + sticker_segment
             try:
-                await get_bot().send_group_msg(group_id=int(group_id), message=full_msg)
+                await asyncio.wait_for(
+                    get_bot().send_group_msg(group_id=int(group_id), message=full_msg),
+                    timeout=_BOT_API_TIMEOUT,
+                )
             except ActionFailed as e:
                 print(f"[chat] send sticker+text failed (ActionFailed), group={group_id}, message={e}")
                 await _send_text_or_voice(group_id, text)
@@ -307,9 +480,10 @@ async def _(event: GroupMessageEvent):
     from services.data_store import get_user_sync as _gsu, update_user as _dsu
 
     user_profile = _gsu(user_id)
-    if user_profile and user_profile.get("name", "").startswith("User"):
+    if user_profile:
         real_name = _normalize_text(event.sender.card) or _normalize_text(event.sender.nickname)
-        if real_name and real_name != user_profile["name"]:
+        if real_name and real_name != user_profile.get("name"):
+            on_user_rename(group_id, user_id, user_profile.get("name", ""), real_name)
             await _dsu(
                 user_id,
                 {
@@ -397,10 +571,16 @@ async def _(event: GroupMessageEvent):
         group_last_active[group_id] = time.time()
         update_mood(text)
         mood = get_mood()
-        reply = await _safe_ask(text, user_id, group_id, user_name, mentioned_ids, mood)
+        reply, used_no_token = await _safe_ask(text, user_id, group_id, user_name, mentioned_ids, mood)
         nya_record(text, mentioned_ids)
         learn_catchphrase(reply)
-        await _send_reply(group_id, reply, event)
+        await _send_reply(
+            group_id,
+            reply,
+            event,
+            typing_habit=False if used_no_token else True,
+            auto_sticker=not used_no_token,
+        )
         await chat.finish()
 
     bot_at_mentioned = _is_bot_mentioned(event, at_ids, text)
@@ -426,9 +606,15 @@ async def _(event: GroupMessageEvent):
         update_mood(text)
         mood = get_mood()
         nya_record(text, mentioned_ids)
-        reply = await _safe_ask(text, user_id, group_id, user_name, mentioned_ids, mood)
+        reply, used_no_token = await _safe_ask(text, user_id, group_id, user_name, mentioned_ids, mood)
         learn_catchphrase(reply)
-        await _send_reply(group_id, reply, event)
+        await _send_reply(
+            group_id,
+            reply,
+            event,
+            typing_habit=False if used_no_token else True,
+            auto_sticker=not used_no_token,
+        )
         await chat.finish()
     else:
         print(f"[chat] skip reply: group={group_id}, user={user_id}, force={force_reply}, at={bot_at_mentioned}, followup={followup_left}, text={text[:60]!r}")
