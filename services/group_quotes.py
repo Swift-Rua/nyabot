@@ -1,4 +1,4 @@
-"""Store and sample group message snippets for offline fallback replies."""
+﻿"""Store and sample group message snippets for offline fallback replies."""
 
 import asyncio
 import json
@@ -23,20 +23,15 @@ def _normalize_quote_text(text: str, speaker_name: str | None = None) -> str:
     if not text:
         return ""
 
-    # remove cq raw at tokens and user mentions like @name / @123
     text = _AT_TOKEN_RE.sub("", text)
-    text = re.sub(r"[@＠][^\s,，。！？!?；;:：、]*", "", text)
-    text = re.sub(r"\s+", " ", text).strip()
-
+    text = re.sub(r"@[^\s,。！？、~]*", "", text)
     if speaker_name:
         name_pattern = _NAME_PREFIX_RE_TEMPLATE.format(name=re.escape(str(speaker_name).strip()))
         text = re.sub(name_pattern, "", text)
         text = re.sub(rf"^\s*{re.escape(str(speaker_name).strip())}\b\s*", "", text)
 
-    # remove remaining punctuation-only messages
-    text = text.strip(" .,:;!!?！？。！？～~（）()[]【】「」“”")
+    text = text.strip(" .,:;!?~[]()")
     return text.strip()
-
 
 def _load() -> dict[str, dict[str, list[dict]]]:
     if not os.path.exists(QUOTE_FILE):
@@ -63,9 +58,60 @@ def _trim(items: list[dict]) -> list[dict]:
     if not items:
         return items
 
-    # 满500条时随机移除一条，再保留最新插入机会
     idx = random.randrange(len(items))
     return items[:idx] + items[idx + 1 :]
+
+
+def _to_text(item: object) -> str:
+    if not isinstance(item, dict):
+        return ""
+    return clean_text(item.get("text") or "")
+
+
+def get_quotes(group_id: str | None = None, seed: str | None = None, limit: int = 6) -> list[str]:
+    data = _load()
+    groups = data.get("groups")
+    if not isinstance(groups, dict):
+        return []
+
+    pool: list[dict] = []
+    if group_id:
+        raw = groups.get(str(group_id).strip())
+        if isinstance(raw, list):
+            pool.extend(raw)
+    else:
+        for raw in groups.values():
+            if isinstance(raw, list):
+                pool.extend(raw)
+
+    if not pool:
+        return []
+
+    normalized = [q for q in pool if _to_text(q)]
+    if not normalized:
+        return []
+
+    if seed:
+        key = clean_text(seed).lower()
+        if key:
+            tokens = [tok for tok in key.split() if tok]
+            if not tokens:
+                tokens = [key]
+
+            matched: list[dict] = []
+            for quote in normalized:
+                text = _to_text(quote).lower()
+                if any(token in text for token in tokens):
+                    matched.append(quote)
+            if matched:
+                normalized = matched
+
+    if not normalized:
+        return []
+
+    random.shuffle(normalized)
+    max_items = max(1, min(int(limit), len(normalized)))
+    return [_to_text(item) for item in normalized[:max_items]]
 
 
 async def add_quote(group_id: str, user_id: str, user_name: str, text: str):
@@ -93,7 +139,6 @@ async def add_quote(group_id: str, user_id: str, user_name: str, text: str):
             "created": time.strftime("%Y-%m-%d %H:%M"),
         }
 
-        # prevent immediate duplicate noise from flooding storage
         if not quotes or quotes[-1].get("text") != text or quotes[-1].get("user_id") != user_id:
             quotes.append(quote)
             quotes = _trim(quotes)
@@ -103,15 +148,7 @@ async def add_quote(group_id: str, user_id: str, user_name: str, text: str):
 
 
 async def get_random_quote(group_id: str | None = None) -> str | None:
-    async with _LOCK:
-        data = _load()
-        groups = data.get("groups")
-        if not isinstance(groups, dict):
-            return None
-        all_quotes: list[dict] = []
-        for group_quotes in groups.values():
-            if isinstance(group_quotes, list):
-                all_quotes.extend(group_quotes)
-        if not all_quotes:
-            return None
-        return random.choice(all_quotes).get("text")
+    candidates = get_quotes(group_id=group_id, limit=1)
+    if not candidates:
+        return None
+    return candidates[0]

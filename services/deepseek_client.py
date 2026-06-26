@@ -4,6 +4,7 @@ DeepSeek AI 客户端：统一上下文构建 + API 调用。
 """
 import os
 import random
+import asyncio
 
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -15,6 +16,8 @@ load_dotenv()
 client = OpenAI(
     api_key=os.getenv("DEEPSEEK_API_KEY"),
     base_url=os.getenv("DEEPSEEK_BASE_URL"),
+    timeout=10.0,
+    max_retries=0,
 )
 
 _ERR_FALLBACKS = (
@@ -290,17 +293,24 @@ async def ask_ai(
     user_content = f"{name_prefix}: {message}" if name_prefix else message
 
     try:
-        response = client.chat.completions.create(
-            model=os.getenv("MODEL", "deepseek-chat"),
-            messages=[
-                {"role": "system", "content": system_content},
-                {"role": "user", "content": user_content},
-            ],
-            temperature=1.1,
-        )
+        def _request_sync():
+            return client.chat.completions.create(
+                model=os.getenv("MODEL", "deepseek-chat"),
+                messages=[
+                    {"role": "system", "content": system_content},
+                    {"role": "user", "content": user_content},
+                ],
+                temperature=1.1,
+            )
+
+        response = await asyncio.wait_for(asyncio.to_thread(_request_sync), timeout=8)
         reply = (response.choices[0].message.content or "").strip()
         _set_ai_status("ok")
         return reply or _fallback_reply()
+    except asyncio.TimeoutError:
+        _set_ai_status("no_tokens")
+        print("[AI] deepseek ask timeout")
+        return _fallback_reply()
     except Exception as e:
         _set_ai_status(_classify_ai_error(e))
         print(f"[AI] deepseek ask failed: {type(e).__name__}: {e}")

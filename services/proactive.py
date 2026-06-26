@@ -14,6 +14,8 @@ from services.deepseek_client import ask_ai
 from services.tts import send_voice_reply
 from services.mood import get as get_mood, decay as decay_mood
 
+_BOT_API_TIMEOUT = 8.0
+
 
 # ═══════════════════════════════════════════
 # 成员记录（有新消息时调用）
@@ -194,12 +196,12 @@ async def try_proactive_say(group_id: str):
 
     try:
         if group_voice_mode.get(group_id, False):
-            await send_voice_reply(int(group_id), reply)
+            await asyncio.wait_for(send_voice_reply(int(group_id), reply), timeout=_BOT_API_TIMEOUT)
         else:
             bot = get_bot()
-            await bot.send_group_msg(
-                group_id=int(group_id),
-                message=reply,
+            await asyncio.wait_for(
+                bot.send_group_msg(group_id=int(group_id), message=reply),
+                timeout=_BOT_API_TIMEOUT,
             )
     except Exception as e:
         print(f"[proactive] send error: {e}")
@@ -227,5 +229,7 @@ async def proactive_loop():
             try:
                 check_auto(group_id)
                 await try_proactive_say(group_id)
+            except asyncio.CancelledError:
+                raise
             except Exception as e:
                 print(f"[proactive] loop error: {e}")

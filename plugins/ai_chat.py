@@ -498,7 +498,19 @@ async def _(event: GroupMessageEvent):
     user_name = _get_name(user_id)
 
     sticker_info = sticker_detect(event)
-    await collect_from_event(event, user_name)
+    # 图片收集改为异步，不阻塞主消息链
+    async def _background_collect():
+        try:
+            await asyncio.wait_for(collect_from_event(event, user_name), timeout=8.0)
+        except asyncio.TimeoutError:
+            print(f"[sticker] collect timeout for user {user_name}")
+        except Exception as e:
+            print(f"[sticker] background collect task failed: {type(e).__name__}: {e}")
+
+    try:
+        asyncio.create_task(_background_collect())
+    except Exception as e:
+        print(f"[sticker] create background collect task failed: {type(e).__name__}: {e}")
     if sticker_info.get("faces"):
         face_desc = face_to_text(sticker_info["faces"])
         text = f"{text} [faces: {face_desc}]" if text else f"[faces: {face_desc}]"

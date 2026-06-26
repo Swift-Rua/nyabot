@@ -120,6 +120,8 @@ async def impression_loop():
         for group_id in groups:
             try:
                 await update_impressions(group_id)
+            except asyncio.CancelledError:
+                raise
             except Exception as e:
                 print(f"[impression] loop error ({group_id}): {e}")
 

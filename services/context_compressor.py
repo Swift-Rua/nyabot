@@ -8,6 +8,7 @@ from services.message_logger import (
     get_active_group_ids,
     get_latest_message_time,
     get_message_snapshot,
+    get_member_profile,
     log_message,
 )
 from services.utils import clean_text, is_noise, short
@@ -151,6 +152,21 @@ def record_message(
             message_id=message_id,
             reply_to=reply_to,
         )
+        try:
+            profile = get_member_profile(group_id, user_id)
+            message_count = None
+            if isinstance(profile, dict):
+                message_count = profile.get("message_count")
+            from services.event_system import on_group_message
+
+            on_group_message(
+                group_id=group_id,
+                user_id=user_id,
+                user_name=user_name,
+                message_count=message_count if isinstance(message_count, int) else None,
+            )
+        except Exception as e:
+            print(f"[context] event record failed: {type(e).__name__}: {e}")
         from services.mood_profile import record_message as record_mood_profile
         from services.time_profile import record_message as record_time_profile
 

@@ -21,6 +21,8 @@ EVENTS_FILE = os.path.join(BASE_DIR, "data", "group_events.json")
 _client = OpenAI(
     api_key=os.getenv("DEEPSEEK_API_KEY"),
     base_url=os.getenv("DEEPSEEK_BASE_URL"),
+    timeout=10.0,
+    max_retries=0,
 )
 
 SUMMARY_PROMPT = """You are summarizing recent group history.
@@ -74,15 +76,22 @@ async def generate_summary(group_id: str):
         return
 
     try:
-        response = _client.chat.completions.create(
-            model=os.getenv("MODEL", "deepseek-chat"),
-            messages=[
-                {"role": "system", "content": SUMMARY_PROMPT},
-                {"role": "user", "content": f"Recent group context:\n{ctx}"},
-            ],
-            temperature=0.5,
-            max_tokens=300,
-        )
+        def _request_sync():
+            return _client.chat.completions.create(
+                model=os.getenv("MODEL", "deepseek-chat"),
+                messages=[
+                    {"role": "system", "content": SUMMARY_PROMPT},
+                    {"role": "user", "content": f"Recent group context:\n{ctx}"},
+                ],
+                temperature=0.5,
+                max_tokens=300,
+            )
+
+        response = await asyncio.wait_for(asyncio.to_thread(_request_sync), timeout=8)
+    except asyncio.TimeoutError:
+        print("[events] generate_summary timeout")
+        return
+    try:
         text = response.choices[0].message.content or ""
     except Exception as e:
         print(f"[events] AI error: {e}")
@@ -139,5 +148,7 @@ async def event_loop():
                 try:
                     await generate_summary(group_id)
                     done_today[group_id] = today
+                except asyncio.CancelledError:
+                    raise
                 except Exception as e:
                     print(f"[events] summary error for {group_id}: {e}")

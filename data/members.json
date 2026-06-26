@@ -1169,13 +1169,13 @@
         },
         "3889045760": {
           "type": "acquaintance",
-          "affinity": 29,
+          "affinity": 27,
           "interaction": 1,
           "last_chat": "06-26 05:38"
         },
         "3889001246": {
           "type": "acquaintance",
-          "affinity": 34,
+          "affinity": 32,
           "interaction": 3,
           "last_chat": "06-26 06:14"
         }
@@ -1563,7 +1563,7 @@
         }
       },
       "meta": {
-        "last_seen": "06-25 10:38"
+        "last_seen": "06-26 11:51"
       },
       "affinity": {},
       "aliases": []
@@ -1944,7 +1944,7 @@
         }
       },
       "meta": {
-        "last_seen": "06-25 11:38"
+        "last_seen": "06-26 12:21"
       },
       "affinity": {},
       "aliases": [
@@ -3090,7 +3090,7 @@
         },
         "1468016530": {
           "type": "acquaintance",
-          "affinity": 35,
+          "affinity": 33,
           "interaction": 1,
           "last_chat": "06-26 06:41"
         }
@@ -3198,10 +3198,16 @@
           "affinity": 20,
           "interaction": 1,
           "last_chat": "06-26 00:53"
+        },
+        "1065934983": {
+          "type": "acquaintance",
+          "affinity": 50,
+          "interaction": 1,
+          "last_chat": "06-26 11:25"
         }
       },
       "meta": {
-        "last_seen": "06-26 00:53"
+        "last_seen": "06-26 11:25"
       },
       "affinity": {},
       "aliases": []
@@ -3739,19 +3745,19 @@
         },
         "2995510599": {
           "type": "acquaintance",
-          "affinity": 44,
+          "affinity": 42,
           "interaction": 1,
           "last_chat": "06-26 08:17"
         },
         "2896431618": {
           "type": "acquaintance",
-          "affinity": 47,
+          "affinity": 45,
           "interaction": 1,
           "last_chat": "06-26 08:41"
         },
         "1363860943": {
           "type": "acquaintance",
-          "affinity": 49,
+          "affinity": 47,
           "interaction": 1,
           "last_chat": "06-26 09:06"
         }
@@ -4118,9 +4124,9 @@
         },
         "764541761": {
           "type": "acquaintance",
-          "affinity": 38,
-          "interaction": 5,
-          "last_chat": "06-25 23:43"
+          "affinity": 39,
+          "interaction": 6,
+          "last_chat": "06-26 11:53"
         },
         "370727979": {
           "type": "acquaintance",
@@ -4136,7 +4142,7 @@
         }
       },
       "meta": {
-        "last_seen": "06-26 02:08"
+        "last_seen": "06-26 11:53"
       },
       "affinity": {},
       "aliases": [
@@ -4205,7 +4211,7 @@
         }
       },
       "meta": {
-        "last_seen": "06-24 20:48"
+        "last_seen": "06-26 12:23"
       },
       "affinity": {},
       "aliases": []
@@ -4482,7 +4488,7 @@
     },
     "1006018503": {
       "style": "偏内向的二次元玩家，聊天风格轻松随意，适合游戏与玩梗话题。",
-      "name": "叶酱（带带叶）",
+      "name": "叶酱",
       "tags": {
         "core": [
           "ISFP"
@@ -4571,12 +4577,9 @@
         "location": {
           "origin": "福建"
         },
-        "last_seen": "06-26 09:08"
+        "last_seen": "06-26 11:27"
       },
-      "aliases": [
-        "叶酱",
-        "带带叶"
-      ]
+      "aliases": []
     },
     "836997011": {
       "style": "普通用户",
@@ -4609,7 +4612,7 @@
         },
         "2910897592": {
           "type": "acquaintance",
-          "affinity": 45,
+          "affinity": 43,
           "interaction": 1,
           "last_chat": "06-26 08:19"
         }
@@ -5028,7 +5031,7 @@
         }
       },
       "meta": {
-        "last_seen": "06-25 21:02"
+        "last_seen": "06-26 12:21"
       },
       "affinity": {},
       "aliases": [
@@ -5469,7 +5472,7 @@
         }
       },
       "meta": {
-        "last_seen": "06-25 11:47"
+        "last_seen": "06-26 12:15"
       },
       "affinity": {},
       "aliases": []
@@ -5697,7 +5700,7 @@
         },
         "3889045760": {
           "type": "acquaintance",
-          "affinity": 32,
+          "affinity": 30,
           "interaction": 1,
           "last_chat": "06-26 06:13"
         }
@@ -5961,7 +5964,7 @@
         }
       },
       "meta": {
-        "last_seen": "06-26 08:49"
+        "last_seen": "06-26 11:41"
       },
       "affinity": {},
       "aliases": []
@@ -6352,10 +6355,16 @@
           "affinity": 20,
           "interaction": 1,
           "last_chat": "06-25 09:59"
+        },
+        "1065934983": {
+          "type": "acquaintance",
+          "affinity": 50,
+          "interaction": 1,
+          "last_chat": "06-26 11:42"
         }
       },
       "meta": {
-        "last_seen": "06-25 11:52"
+        "last_seen": "06-26 11:51"
       },
       "affinity": {},
       "aliases": []
@@ -6442,13 +6451,19 @@
         },
         "647466906": {
           "type": "acquaintance",
-          "affinity": 47,
+          "affinity": 45,
           "interaction": 1,
           "last_chat": "06-26 08:38"
+        },
+        "848129048": {
+          "type": "acquaintance",
+          "affinity": 50,
+          "interaction": 1,
+          "last_chat": "06-26 11:20"
         }
       },
       "meta": {
-        "last_seen": "06-26 08:49"
+        "last_seen": "06-26 11:20"
       },
       "affinity": {},
       "aliases": []
@@ -7006,7 +7021,7 @@
         }
       },
       "meta": {
-        "last_seen": "06-26 08:56"
+        "last_seen": "06-26 10:56"
       },
       "affinity": {},
       "aliases": []
@@ -7737,13 +7752,13 @@
         },
         "3513154473": {
           "type": "acquaintance",
-          "affinity": 47,
+          "affinity": 45,
           "interaction": 3,
           "last_chat": "06-26 08:45"
         },
         "1363860943": {
           "type": "acquaintance",
-          "affinity": 46,
+          "affinity": 44,
           "interaction": 1,
           "last_chat": "06-26 08:32"
         }
@@ -7759,7 +7774,7 @@
     },
     "1213731437": {
       "style": "普通用户",
-      "name": "用户1213731437",
+      "name": "普通小狗",
       "tags": {
         "core": [],
         "behavior": [
@@ -7782,7 +7797,7 @@
         }
       },
       "meta": {
-        "last_seen": "06-25 11:37"
+        "last_seen": "06-26 12:19"
       },
       "affinity": {},
       "aliases": []
@@ -8181,8 +8196,8 @@
         "764541761": {
           "type": "acquaintance",
           "affinity": 20,
-          "interaction": 1,
-          "last_chat": "06-24 16:10"
+          "interaction": 2,
+          "last_chat": "06-26 11:16"
         },
         "2797795487": {
           "type": "acquaintance",
@@ -8198,25 +8213,37 @@
         },
         "370727979": {
           "type": "acquaintance",
-          "affinity": 43,
+          "affinity": 41,
           "interaction": 2,
           "last_chat": "06-26 08:54"
         },
         "3347067991": {
           "type": "acquaintance",
-          "affinity": 47,
-          "interaction": 1,
-          "last_chat": "06-26 08:39"
+          "affinity": 46,
+          "interaction": 2,
+          "last_chat": "06-26 10:45"
         },
         "987864595": {
           "type": "acquaintance",
-          "affinity": 48,
+          "affinity": 46,
           "interaction": 1,
           "last_chat": "06-26 08:54"
+        },
+        "437391030": {
+          "type": "acquaintance",
+          "affinity": 50,
+          "interaction": 1,
+          "last_chat": "06-26 11:13"
+        },
+        "1606870747": {
+          "type": "acquaintance",
+          "affinity": 50,
+          "interaction": 1,
+          "last_chat": "06-26 12:20"
         }
       },
       "meta": {
-        "last_seen": "06-26 08:57"
+        "last_seen": "06-26 12:23"
       },
       "affinity": {},
       "aliases": []
@@ -8659,13 +8686,13 @@
       "relations": {
         "3513154473": {
           "type": "acquaintance",
-          "affinity": 46,
+          "affinity": 44,
           "interaction": 1,
           "last_chat": "06-26 08:31"
         },
         "3427257215": {
           "type": "acquaintance",
-          "affinity": 46,
+          "affinity": 44,
           "interaction": 1,
           "last_chat": "06-26 08:35"
         }
@@ -8734,7 +8761,7 @@
         },
         "3513154473": {
           "type": "acquaintance",
-          "affinity": 46,
+          "affinity": 44,
           "interaction": 1,
           "last_chat": "06-26 08:31"
         }
@@ -9339,7 +9366,7 @@
     },
     "764541761": {
       "style": "发散型聊天风格，容易带动群聊气氛。",
-      "name": "迅捷",
+      "name": "迅牛牛",
       "tags": {
         "core": [
           "ENTP"
@@ -9380,9 +9407,9 @@
           "type": "acquaintance"
         },
         "848129048": {
-          "last_chat": "06-25 20:55",
-          "affinity": 37,
-          "interaction": 21,
+          "last_chat": "06-26 12:20",
+          "affinity": 42,
+          "interaction": 26,
           "type": "acquaintance"
         },
         "2827439724": {
@@ -9440,9 +9467,9 @@
           "type": "acquaintance"
         },
         "1006018503": {
-          "last_chat": "06-25 22:23",
-          "affinity": 22,
-          "interaction": 6,
+          "last_chat": "06-26 12:19",
+          "affinity": 23,
+          "interaction": 7,
           "type": "friend"
         },
         "987864595": {
@@ -9667,7 +9694,7 @@
         "identity": {
           "role": "self"
         },
-        "last_seen": "06-26 00:50"
+        "last_seen": "06-26 12:23"
       },
       "aliases": []
     },
@@ -10000,7 +10027,7 @@
         }
       },
       "meta": {
-        "last_seen": "06-25 19:25"
+        "last_seen": "06-26 11:48"
       },
       "affinity": {},
       "aliases": []
@@ -10548,13 +10575,19 @@
         },
         "2524057618": {
           "type": "acquaintance",
-          "affinity": 35,
+          "affinity": 33,
           "interaction": 1,
           "last_chat": "06-26 06:41"
+        },
+        "1606870747": {
+          "type": "acquaintance",
+          "affinity": 50,
+          "interaction": 1,
+          "last_chat": "06-26 11:41"
         }
       },
       "meta": {
-        "last_seen": "06-26 06:44"
+        "last_seen": "06-26 11:41"
       },
       "affinity": {},
       "aliases": []
@@ -10710,14 +10743,14 @@
         },
         "1141951296": {
           "type": "acquaintance",
-          "affinity": 34,
+          "affinity": 32,
           "interaction": 3,
           "last_chat": "06-26 06:14"
         }
       },
       "meta": {
         "impression": "普通用户",
-        "last_seen": "06-26 06:14"
+        "last_seen": "06-26 10:48"
       },
       "aliases": []
     },
@@ -10801,9 +10834,9 @@
           "type": "acquaintance"
         },
         "3889001246": {
-          "last_chat": "06-23 22:37",
+          "last_chat": "06-26 10:48",
           "affinity": 20,
-          "interaction": 1,
+          "interaction": 2,
           "type": "acquaintance"
         },
         "227828792": {
@@ -10813,9 +10846,9 @@
           "type": "acquaintance"
         },
         "987864595": {
-          "last_chat": "06-24 21:09",
-          "affinity": 20,
-          "interaction": 4,
+          "last_chat": "06-26 10:56",
+          "affinity": 21,
+          "interaction": 5,
           "type": "acquaintance"
         },
         "848129048": {
@@ -10823,10 +10856,16 @@
           "affinity": 20,
           "interaction": 1,
           "last_chat": "06-24 21:09"
+        },
+        "1065934983": {
+          "type": "acquaintance",
+          "affinity": 50,
+          "interaction": 1,
+          "last_chat": "06-26 10:56"
         }
       },
       "meta": {
-        "last_seen": "06-25 12:59"
+        "last_seen": "06-26 11:16"
       },
       "affinity": {},
       "aliases": [
@@ -11049,13 +11088,13 @@
         },
         "1141951296": {
           "type": "acquaintance",
-          "affinity": 29,
+          "affinity": 27,
           "interaction": 1,
           "last_chat": "06-26 05:38"
         },
         "2386513381": {
           "type": "acquaintance",
-          "affinity": 32,
+          "affinity": 30,
           "interaction": 1,
           "last_chat": "06-26 06:13"
         }
@@ -11434,7 +11473,7 @@
       "aliases": []
     },
     "3502530018": {
-      "name": "用户3502530018",
+      "name": "林思靖",
       "tags": {
         "core": [],
         "interest": [],
@@ -11444,7 +11483,7 @@
       },
       "style": "普通用户",
       "meta": {
-        "last_seen": "06-24 17:06"
+        "last_seen": "06-26 12:07"
       },
       "relations": {
         "2952719573": {
@@ -11452,6 +11491,12 @@
           "affinity": 20,
           "interaction": 2,
           "last_chat": "06-24 14:26"
+        },
+        "1606870747": {
+          "type": "acquaintance",
+          "affinity": 50,
+          "interaction": 1,
+          "last_chat": "06-26 10:55"
         }
       },
       "affinity": {},
@@ -14310,7 +14355,7 @@
       },
       "style": "A normal user style",
       "meta": {
-        "last_seen": "06-24 22:45"
+        "last_seen": "06-26 12:13"
       },
       "relations": {
         "761420475": {
@@ -15526,7 +15571,7 @@
       },
       "style": "A normal user style",
       "meta": {
-        "last_seen": "06-25 11:51"
+        "last_seen": "06-26 12:18"
       },
       "relations": {},
       "affinity": {},
@@ -16080,7 +16125,7 @@
       },
       "style": "A normal user style",
       "meta": {
-        "last_seen": "06-25 07:37"
+        "last_seen": "06-26 11:48"
       },
       "relations": {
         "370727979": {
@@ -16106,6 +16151,12 @@
           "affinity": 20,
           "interaction": 2,
           "last_chat": "06-24 23:53"
+        },
+        "1065934983": {
+          "type": "acquaintance",
+          "affinity": 51,
+          "interaction": 2,
+          "last_chat": "06-26 11:41"
         }
       },
       "affinity": {},
@@ -16645,7 +16696,7 @@
       },
       "style": "A normal user style",
       "meta": {
-        "last_seen": "06-25 09:34"
+        "last_seen": "06-26 12:18"
       },
       "relations": {
         "1015781644": {
@@ -16659,6 +16710,12 @@
           "affinity": 20,
           "interaction": 1,
           "last_chat": "06-25 09:24"
+        },
+        "1065934983": {
+          "type": "acquaintance",
+          "affinity": 50,
+          "interaction": 1,
+          "last_chat": "06-26 12:18"
         }
       },
       "affinity": {},
@@ -17136,7 +17193,7 @@
         },
         "370727979": {
           "type": "acquaintance",
-          "affinity": 45,
+          "affinity": 43,
           "interaction": 1,
           "last_chat": "06-26 08:18"
         }

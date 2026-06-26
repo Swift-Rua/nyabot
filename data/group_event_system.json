@@ -1,0 +1,76 @@
+{
+  "pending_events": {
+    "686484574": [
+      {
+        "time": 1782444333,
+        "type": "join",
+        "text": "Member 1065934983 joined the group.",
+        "meta": {}
+      },
+      {
+        "time": 1782444365,
+        "type": "rename",
+        "text": "Member 764541761 changed name from '迅捷' to '迅牛牛'.",
+        "meta": {}
+      },
+      {
+        "time": 1782447559,
+        "type": "rename",
+        "text": "Member 1213731437 changed name from '用户1213731437' to '普通小狗'.",
+        "meta": {}
+      },
+      {
+        "time": 1782447784,
+        "type": "rename",
+        "text": "Member 764541761 changed name from '迅捷' to '迅牛牛'.",
+        "meta": {}
+      }
+    ],
+    "1004382243": [
+      {
+        "time": 1782444402,
+        "type": "rename",
+        "text": "Member 1006018503 changed name from '叶酱（带带叶）' to '叶酱'.",
+        "meta": {}
+      },
+      {
+        "time": 1782445956,
+        "type": "rename",
+        "text": "Member 764541761 changed name from '迅牛牛' to '迅捷'.",
+        "meta": {}
+      },
+      {
+        "time": 1782446838,
+        "type": "rename",
+        "text": "Member 3502530018 changed name from '用户3502530018' to '林思靖'.",
+        "meta": {}
+      }
+    ],
+    "948939805": [
+      {
+        "time": 1782447566,
+        "type": "rename",
+        "text": "Member 764541761 changed name from '迅牛牛' to '迅捷'.",
+        "meta": {}
+      }
+    ]
+  },
+  "streaks": {
+    "1004382243": {
+      "user_id": "647466906",
+      "count": 1,
+      "last_seen": 1782447831
+    },
+    "686484574": {
+      "user_id": "3466956278",
+      "count": 2,
+      "last_seen": 1782447840
+    },
+    "948939805": {
+      "user_id": "764541761",
+      "count": 2,
+      "last_seen": 1782447566
+    }
+  },
+  "milestones": {}
+}

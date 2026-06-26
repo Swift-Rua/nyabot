@@ -47,6 +47,25 @@ def _get_session() -> aiohttp.ClientSession:
     return _HTTP_SESSION
 
 
+def close_session():
+    """Close shared HTTP session."""
+    global _HTTP_SESSION
+    sess = _HTTP_SESSION
+    _HTTP_SESSION = None
+    if sess is None:
+        return
+    try:
+        import asyncio
+
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            loop.create_task(sess.close())
+        else:
+            loop.run_until_complete(sess.close())
+    except Exception:
+        pass
+
+
 def _is_safe_image_url(url: str) -> bool:
     """Validate image source url is trusted."""
     try:
