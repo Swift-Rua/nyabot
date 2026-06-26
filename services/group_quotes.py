@@ -11,7 +11,7 @@ from services.utils import clean_text
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 QUOTE_FILE = os.path.join(BASE_DIR, "data", "group_quotes.json")
-MAX_QUOTES_PER_GROUP = 500
+MAX_QUOTES_PER_GROUP = 5000
 
 _LOCK = asyncio.Lock()
 _AT_TOKEN_RE = re.compile(r"\[CQ:at,qq=\d+\]")

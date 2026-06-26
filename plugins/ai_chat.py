@@ -21,6 +21,7 @@ from services.data_store import get_group_name, get_user_sync
 from services.deepseek_client import _fallback_reply as _deep_fallback_reply
 from services.deepseek_client import ask_ai, was_last_ai_call_no_tokens
 from services.group_reply_policy import get_group_default_reply_prob
+from services.offline_responder import build_no_token_reply
 from services.mention_resolver import parse_at_from_event, resolve_mentions
 from services.group_quotes import add_quote, get_random_quote
 from services.mood import get as get_mood, update as update_mood
@@ -105,10 +106,29 @@ async def _safe_ask(text, user_id, group_id, user_name, mentioned_ids, mood, max
             mentioned_ids=mentioned_ids,
             mood_state=mood,
         )
-        if was_last_ai_call_no_tokens() and group_id:
-            quote = await get_random_quote(group_id)
+        if was_last_ai_call_no_tokens():
+            offline = build_no_token_reply(
+                group_id=group_id,
+                user_id=user_id,
+                mentioned_ids=mentioned_ids,
+                seed=text,
+                mood_state=mood,
+            )
+            if not offline:
+                offline = build_no_token_reply(
+                    group_id=None,
+                    user_id=user_id,
+                    mentioned_ids=mentioned_ids,
+                    seed=text,
+                    mood_state=mood,
+                )
+            if offline:
+                return offline
+
+            quote = await get_random_quote()
             if quote:
                 return quote
+            return _fallback_reply()
 
         reply = _normalize_text(reply)
 
@@ -162,6 +182,37 @@ async def _resolve_group_name(group_id: str) -> str:
         pass
 
     return ""
+
+
+def _extract_reply_to(event: GroupMessageEvent) -> str | None:
+    reply_obj = getattr(event, "reply", None)
+    if isinstance(reply_obj, dict):
+        return _normalize_text(reply_obj.get("message_id"))
+    if reply_obj is None:
+        return None
+    try:
+        if _normalize_text(getattr(reply_obj, "message_id", "")):
+            return _normalize_text(reply_obj.message_id)
+    except Exception:
+        pass
+    return None
+
+
+def _extract_reply_user(event: GroupMessageEvent) -> str | None:
+    reply_obj = getattr(event, "reply", None)
+    if isinstance(reply_obj, dict):
+        uid = str(reply_obj.get("user_id") or "").strip()
+        if uid:
+            return uid
+    if reply_obj is None:
+        return None
+    try:
+        uid = str(getattr(reply_obj, "user_id", "")).strip()
+        if uid:
+            return uid
+    except Exception:
+        pass
+    return None
 
 
 async def _send_text_or_voice(group_id: str, text: str):
@@ -289,7 +340,21 @@ async def _(event: GroupMessageEvent):
     if not is_noise(raw_text) and not _is_control_command(raw_text):
         await add_quote(group_id, user_id, user_name, raw_text)
 
-    record_message(group_id, user_name, text)
+    has_image = bool(sticker_info.get("images"))
+    has_face = bool(sticker_info.get("faces"))
+    record_message(
+        group_id,
+        user_name,
+        text,
+        user_id=user_id,
+        message_id=getattr(event, "message_id", None),
+        reply_to=_extract_reply_to(event),
+        at_list=at_ids,
+        message_type=getattr(event, "message_type", "group"),
+        has_image=has_image,
+        has_face=has_face,
+        face_ids=sticker_info.get("faces"),
+    )
     gate.set_group_default_prob(group_id, get_group_default_reply_prob(group_id, DEFAULT_REPLY_PROB))
 
     if _is_control_command(text):
@@ -320,10 +385,13 @@ async def _(event: GroupMessageEvent):
         await chat.finish("Reply probability restored to default.")
 
     mentioned_ids = list(set(at_ids + resolve_mentions(text)))
-    if mentioned_ids:
+    reply_user = _extract_reply_user(event)
+    relation_targets = set(mentioned_ids)
+    if reply_user:
+        relation_targets.add(reply_user)
+    if relation_targets:
         from services.relation import record as record_relation
-
-        await record_relation(user_id, mentioned_ids)
+        await record_relation(user_id, list(relation_targets), group_id, replied_user_id=reply_user)
 
     if group_state.get(group_id, False):
         group_last_active[group_id] = time.time()

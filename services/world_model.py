@@ -1,14 +1,74 @@
 """Build world context for prompt generation."""
 
+import time
+
 from services.data_store import (
     get_core_members,
     get_group_members,
     get_group_name,
     get_users_sync,
 )
+from services.message_logger import get_member_profile
+from services.relation import get_incoming_relations, get_outgoing_relations
 from services.context_compressor import compress
 
 WORLD_GROUP_MEMBER_CONTEXT_LIMIT = 60
+
+
+def _format_member_profile(profile: dict | None) -> str:
+    if not isinstance(profile, dict):
+        return ""
+    msg_count = int(profile.get("message_count", 0))
+    total_len = int(profile.get("total_length", 0))
+    image_count = int(profile.get("image_count", 0))
+    face_count = int(profile.get("face_count", 0))
+    mention_count = int(profile.get("mention_count", 0))
+    first_seen = float(profile.get("first_seen", 0.0))
+    last_seen = float(profile.get("last_seen", 0.0))
+
+    lines: list[str] = []
+    lines.append(f"Messages: {msg_count}")
+    lines.append(f"Total length: {total_len}")
+    lines.append(f"Images: {image_count}")
+    lines.append(f"Faces: {face_count}")
+    lines.append(f"Mentioned count: {mention_count}")
+    if first_seen:
+        lines.append(f"First seen: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(first_seen))}")
+    if last_seen:
+        lines.append(f"Last seen: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(last_seen))}")
+    return " / ".join(lines)
+
+
+def _format_relation_lines(user_id: str, group_id: str | None) -> str:
+    if not group_id:
+        return ""
+
+    uid = str(user_id)
+    users = get_users_sync()
+    out: list[str] = []
+
+    outgoing = get_outgoing_relations(uid, group_id=group_id, limit=5)
+    for rel in outgoing:
+        target_id = str(rel.get("target_id", ""))
+        if not target_id:
+            continue
+        score = f"{rel.get('interaction', 0)}/{rel.get('affinity', 50)}"
+        target_name = users.get(target_id, {}).get("name", target_id) if isinstance(users, dict) else target_id
+        out.append(f"- 与 {target_name}({target_id}) 的互动更频繁，交互{score}")
+
+    incoming = get_incoming_relations(uid, group_id=group_id, limit=5)
+    for rel in incoming:
+        src_id = str(rel.get("speaker_id", ""))
+        if not src_id:
+            continue
+        score = f"{rel.get('interaction', 0)}/{rel.get('affinity', 50)}"
+        src_name = users.get(src_id, {}).get("name", src_id) if isinstance(users, dict) else src_id
+        out.append(f"- {src_name}({src_id}) 最近也比较常指向我，交互{score}")
+
+    if not out:
+        return ""
+    return "\n## Relation hints\n" + "\n".join(out[:10])
+
 
 def _fmt_tags(tags: dict) -> str:
     from services.deepseek_client import _fmt_tags as fmt
@@ -91,6 +151,9 @@ def build(
         name = str(profile.get("name", "Unknown"))
         style = str(profile.get("style", ""))
         tags = _fmt_tags(profile.get("tags", {}))
+        profile_stats = _format_member_profile(
+            get_member_profile(group_id, user_id) if group_id else None
+        )
         impression = str(profile.get("meta", {}).get("impression", "")).strip()
         block = (
             "## Current speaker\n"
@@ -98,6 +161,8 @@ def build(
             f"Tags: {tags}\n"
             f"Style: {style}"
         )
+        if profile_stats:
+            block += f"\nProfile: {profile_stats}"
         if impression:
             block += f"\nImpression: {impression}"
         blocks.append(block)
@@ -111,6 +176,10 @@ def build(
             blocks.append(f"Current group: {group_name} (ID:{group_id})")
         else:
             blocks.append(f"Current group ID: {group_id}")
+
+        relation_block = _format_relation_lines(user_id=user_id, group_id=group_id)
+        if relation_block:
+            blocks.append(relation_block)
 
     if members_in_context:
         lines = ["## Group members for context"]
@@ -196,7 +265,7 @@ def _mood_emoji(key: str, val: int) -> str:
     if key == "social":
         return ":::)" if val > 60 else ":|:" if val > 30 else ":("
     if key == "roast":
-        return "🔥" if val > 60 else "🙂" if val > 30 else "😐"
+        return "😏" if val > 60 else "😐" if val > 30 else "😠"
     if key == "energy":
-        return "⚡" if val > 60 else "🔋" if val > 30 else "🪫"
+        return "⚡" if val > 60 else "🙂" if val > 30 else "😴"
     return "?"

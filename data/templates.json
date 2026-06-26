@@ -1,0 +1,9 @@
+{
+  "templates": [
+    "{speaker} 的发言在最近 {active_days} 天里比较稳定，当前互动强度 {message_count}。",
+    "{speaker} 最近常提到“{topic}”，更像是围绕这个方向在聊天。",
+    "看起来这个群里 {best_friend} 最近互动更频繁，{speaker} 的节奏也很活跃。",
+    "系统观测：{speaker} 在 {active_hour} 点最活跃，最近平均长度 {average_length} 字。",
+    "无token 下的回退回复：{speaker} 提示了“{topic}”，大家可以接着这个线索聊。"
+  ]
+}
