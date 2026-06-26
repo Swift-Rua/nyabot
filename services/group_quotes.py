@@ -102,17 +102,16 @@ async def add_quote(group_id: str, user_id: str, user_name: str, text: str):
             _save(data)
 
 
-async def get_random_quote(group_id: str) -> str | None:
-    group_id = str(group_id).strip()
-    if not group_id:
-        return None
-
+async def get_random_quote(group_id: str | None = None) -> str | None:
     async with _LOCK:
         data = _load()
         groups = data.get("groups")
         if not isinstance(groups, dict):
             return None
-        quotes = groups.get(group_id)
-        if not isinstance(quotes, list) or not quotes:
+        all_quotes: list[dict] = []
+        for group_quotes in groups.values():
+            if isinstance(group_quotes, list):
+                all_quotes.extend(group_quotes)
+        if not all_quotes:
             return None
-        return random.choice(quotes).get("text")
+        return random.choice(all_quotes).get("text")
