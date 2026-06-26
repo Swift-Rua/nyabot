@@ -4,6 +4,7 @@ import json
 import os
 import re
 import sqlite3
+import random
 import threading
 import time
 
@@ -18,6 +19,13 @@ MAX_FACE_TRACK_PER_MESSAGE = 5
 MAX_WORD_TRACK_PER_MESSAGE = 80
 MAX_PROFILE_QUERY = 200
 MAX_PROFILE_TOP = 200
+MAX_TERM_TRACK_PER_MESSAGE = 40
+HISTORY_POOL_500 = 500
+HISTORY_POOL_1000 = 1000
+
+GLOBAL_SCOPE = "global"
+SCOPE_GLOBAL_TERMS = "global_terms"
+SCOPE_GROUP_TERMS = "group_terms"
 
 _STOP_WORDS = {
     "the",
@@ -42,6 +50,7 @@ _STOP_WORDS = {
 }
 
 _WORD_RE = re.compile(r"[A-Za-z0-9\u4e00-\u9fff]{2,}")
+_CHAR_TERM_RE = re.compile(r"[A-Za-z0-9\u4e00-\u9fff]+")
 _DB_LOCK = threading.Lock()
 
 
@@ -60,6 +69,83 @@ def _normalize_nickname(name: object) -> str:
 
 def _normalize_text(text: object) -> str:
     return clean_text(str(text)) if text is not None else ""
+
+
+def _extract_phrases(message: str) -> list[str]:
+    text = clean_text(message).lower()
+    if not text:
+        return []
+
+    compact = re.sub(r"[\s\[\]\(\)！!，,。.、：:；;?？~～\-_=+|<>【】“”‘’\"'`·]+", "", text)
+    compact = compact.replace("&amp;", "").replace("amp;", "")
+    if len(compact) < 2:
+        return []
+
+    terms: list[str] = []
+    seen: set[str] = set()
+    for length in (2, 3, 4):
+        if len(compact) < length:
+            continue
+        window_step = 1 if len(compact) <= 16 else 2
+        for idx in range(0, len(compact) - length + 1, window_step):
+            piece = compact[idx : idx + length]
+            if piece in _STOP_WORDS or piece in seen:
+                continue
+            seen.add(piece)
+            terms.append(piece)
+            if len(terms) >= MAX_TERM_TRACK_PER_MESSAGE:
+                return terms
+
+    for segment in _CHAR_TERM_RE.findall(compact):
+        seg = segment.strip()
+        if len(seg) < 2 or seg in _STOP_WORDS:
+            continue
+        candidates = [seg]
+        if len(seg) > 4:
+            candidates.extend((seg[:4], seg[-4:]))
+        for piece in candidates:
+            if not piece or piece in seen or piece in _STOP_WORDS:
+                continue
+            seen.add(piece)
+            terms.append(piece)
+            if len(terms) >= MAX_TERM_TRACK_PER_MESSAGE:
+                return terms
+
+    return terms
+
+
+_FILLER_MARKERS = (
+    "哈哈",
+    "哈哈哈",
+    "哈哈哈哈",
+    "哈哈哈哈哈",
+    "草",
+    "卧槽",
+    "绷",
+    "笑死",
+    "真的假的",
+    "牛逼",
+    "666",
+    "？？？",
+    "...",
+    "。。。",
+)
+
+
+def _extract_fillers(message: str) -> list[str]:
+    text = clean_text(message).lower()
+    if not text:
+        return []
+
+    out: list[str] = []
+    seen: set[str] = set()
+    for token in _FILLER_MARKERS:
+        if token in text and token not in seen:
+            seen.add(token)
+            out.append(token)
+            if len(out) >= 12:
+                break
+    return out
 
 
 def _normalize_at_list(at_list: object) -> list[str]:
@@ -111,6 +197,108 @@ def _extract_tokens(message: str) -> list[str]:
         out.append(token)
         if len(out) >= MAX_WORD_TRACK_PER_MESSAGE:
             break
+    return out
+
+
+def _normalize_pool_size(size: object | None) -> int:
+    try:
+        value = int(size)
+    except (TypeError, ValueError):
+        return MAX_MESSAGES_PER_GROUP
+    if value <= 0:
+        return 1
+    return max(1, min(MAX_MESSAGES_PER_GROUP, value))
+
+
+def _parse_at_payload(raw_at: object) -> list[str]:
+    if not raw_at:
+        return []
+    if isinstance(raw_at, list):
+        return _normalize_at_list(raw_at)
+    try:
+        return _normalize_at_list(json.loads(str(raw_at)))
+    except Exception:
+        return []
+
+
+def _to_message_dict(row: sqlite3.Row) -> dict:
+    return {
+        "id": int(row["id"]),
+        "message_id": row["message_id"],
+        "group_id": row["group_id"],
+        "user_id": row["user_id"],
+        "user_name": row["user_name"] or "User",
+        "timestamp": float(row["ts"]),
+        "message": row["message"] or "",
+        "reply_to": row["reply_to"],
+        "at_list": _parse_at_payload(row["at_list"]),
+        "message_type": row["message_type"] or "group",
+        "length": int(row["length"] or 0),
+        "has_image": bool(int(row["has_image"] or 0)),
+        "has_face": bool(int(row["has_face"] or 0)),
+    }
+
+
+def _track_term_counts(
+    cur: sqlite3.Cursor,
+    scope: str,
+    group_id: str,
+    token_type: str,
+    terms: list[str],
+    now: int,
+) -> None:
+    safe_group = str(group_id).strip() if str(group_id).strip() else ""
+    for token in terms:
+        if not token:
+            continue
+        cur.execute(
+            """
+            INSERT INTO global_terms (
+                scope, group_id, token_type, token, count, first_seen, last_seen
+            ) VALUES (?, ?, ?, ?, 1, ?, ?)
+            ON CONFLICT(scope, group_id, token_type, token) DO UPDATE SET
+                count = count + 1,
+                last_seen = excluded.last_seen
+            """,
+            (scope, safe_group, token_type, _normalize_text(token), now, now),
+        )
+
+
+def _decay_terms(cur: sqlite3.Cursor, now: int) -> None:
+    cur.execute("SELECT COUNT(*) FROM global_terms")
+    total = int(cur.fetchone()[0] or 0)
+    if total <= MAX_PROFILE_TOP * 20:
+        return
+
+    cutoff = now - 30 * 24 * 3600
+    cur.execute("DELETE FROM global_terms WHERE last_seen < ?", (cutoff,))
+
+
+def _get_term_rows(cur: sqlite3.Cursor, scope: str, group_id: str, token_type: str, limit: int) -> list[dict]:
+    if scope not in {SCOPE_GLOBAL_TERMS, SCOPE_GROUP_TERMS}:
+        scope = SCOPE_GLOBAL_TERMS
+    limit = max(1, min(300, int(limit)))
+    cur.execute(
+        """
+        SELECT token, count, first_seen, last_seen
+        FROM global_terms
+        WHERE scope = ? AND token_type = ? AND group_id = ?
+        ORDER BY count DESC, token ASC
+        LIMIT ?
+        """,
+        (scope, token_type, str(group_id).strip() if str(group_id).strip() else GLOBAL_SCOPE, limit),
+    )
+    rows = cur.fetchall()
+    out: list[dict] = []
+    for row in rows:
+        out.append(
+            {
+                "token": str(row["token"]),
+                "count": int(row["count"] or 0),
+                "first_seen": float(row["first_seen"] or 0),
+                "last_seen": float(row["last_seen"] or 0),
+            }
+        )
     return out
 
 
@@ -207,6 +395,21 @@ def _ensure_db() -> None:
             )
             """
         )
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS global_terms (
+                scope TEXT NOT NULL,
+                group_id TEXT NOT NULL,
+                token_type TEXT NOT NULL,
+                token TEXT NOT NULL,
+                count INTEGER NOT NULL DEFAULT 0,
+                first_seen INTEGER NOT NULL,
+                last_seen INTEGER NOT NULL,
+                PRIMARY KEY (scope, group_id, token_type, token)
+            )
+            """
+        )
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_global_terms_scope ON global_terms(scope, group_id, token_type, count DESC)")
         conn.commit()
     finally:
         conn.close()
@@ -428,6 +631,17 @@ def log_message(
                     (group_id, user_id, token),
                 )
 
+            phrases = _extract_phrases(msg)
+            fillers = _extract_fillers(msg)
+
+            now_int = int(now)
+            _track_term_counts(cur, SCOPE_GROUP_TERMS, group_id, "word", tokens, now_int)
+            _track_term_counts(cur, SCOPE_GROUP_TERMS, group_id, "phrase", phrases, now_int)
+            _track_term_counts(cur, SCOPE_GROUP_TERMS, group_id, "filler", fillers, now_int)
+            _track_term_counts(cur, SCOPE_GLOBAL_TERMS, GLOBAL_SCOPE, "word", tokens, now_int)
+            _track_term_counts(cur, SCOPE_GLOBAL_TERMS, GLOBAL_SCOPE, "phrase", phrases, now_int)
+            _track_term_counts(cur, SCOPE_GLOBAL_TERMS, GLOBAL_SCOPE, "filler", fillers, now_int)
+
             for face_id in face_ids:
                 cur.execute(
                     """
@@ -453,6 +667,7 @@ def log_message(
                 (group_id, MAX_MESSAGES_PER_GROUP, group_id),
             )
 
+            _decay_terms(cur, now_int)
             conn.commit()
         finally:
             conn.close()
@@ -498,36 +713,197 @@ def fetch_recent_messages(group_id: str | None = None, limit: int = 80) -> list[
     finally:
         conn.close()
 
-    out: list[dict] = []
-    for row in reversed(rows):
-        raw_at = row["at_list"]
-        if raw_at:
-            try:
-                at_data = json.loads(str(raw_at))
-                at_list = _normalize_at_list(at_data if isinstance(at_data, list) else [])
-            except Exception:
-                at_list = []
-        else:
-            at_list = []
-
-        out.append(
-            {
-                "id": int(row["id"]),
-                "message_id": row["message_id"],
-                "group_id": row["group_id"],
-                "user_id": row["user_id"],
-                "user_name": row["user_name"] or "User",
-                "timestamp": float(row["ts"]),
-                "message": row["message"] or "",
-                "reply_to": row["reply_to"],
-                "at_list": at_list,
-                "message_type": row["message_type"] or "group",
-                "length": int(row["length"] or 0),
-                "has_image": bool(int(row["has_image"] or 0)),
-                "has_face": bool(int(row["has_face"] or 0)),
-            }
-        )
+    out: list[dict] = [_to_message_dict(row) for row in reversed(rows)]
     return out
+
+
+def get_message_pool(group_id: str, pool_size: int = MAX_MESSAGES_PER_GROUP) -> list[dict]:
+    """Get latest messages from one group by pool size (500/1000/5000)."""
+    group_id = _normalize_group_id(group_id)
+    if not group_id:
+        return []
+
+    size = _normalize_pool_size(pool_size)
+    _ensure_db()
+
+    conn = _connect()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT id, message_id, group_id, user_id, user_name, ts, message,
+                   reply_to, at_list, message_type, length, has_image, has_face
+            FROM messages
+            WHERE group_id = ?
+            ORDER BY ts DESC, id DESC
+            LIMIT ?
+            """,
+            (group_id, size),
+        )
+        rows = cur.fetchall()
+    finally:
+        conn.close()
+
+    return [_to_message_dict(row) for row in reversed(rows)]
+
+
+def sample_message_pool(
+    group_id: str,
+    *,
+    pool_size: int = MAX_MESSAGES_PER_GROUP,
+    sample_size: int = 1,
+) -> list[dict]:
+    """Randomly sample message entries from a group's recent pool."""
+    pool = get_message_pool(group_id=group_id, pool_size=pool_size)
+    if not pool:
+        return []
+
+    sample_size = max(1, min(int(sample_size), len(pool)))
+    return random.sample(pool, sample_size)
+
+
+def get_messages_by_user(
+    group_id: str,
+    user_id: str,
+    *,
+    pool_size: int = MAX_MESSAGES_PER_GROUP,
+    limit: int = 80,
+) -> list[dict]:
+    """Get recent messages from one user inside a group's recent pool."""
+    group_id = _normalize_group_id(group_id)
+    uid = _normalize_user_id(user_id)
+    if not group_id or not uid:
+        return []
+
+    size = _normalize_pool_size(pool_size)
+    limit = max(1, min(300, int(limit)))
+
+    _ensure_db()
+    conn = _connect()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT m.id, m.message_id, m.group_id, m.user_id, m.user_name, m.ts, m.message,
+                   m.reply_to, m.at_list, m.message_type, m.length, m.has_image, m.has_face
+            FROM messages m
+            JOIN (
+                SELECT id
+                FROM messages
+                WHERE group_id = ?
+                ORDER BY ts DESC, id DESC
+                LIMIT ?
+            ) AS latest ON latest.id = m.id
+            WHERE m.group_id = ? AND m.user_id = ?
+            ORDER BY m.ts DESC, m.id DESC
+            LIMIT ?
+            """,
+            (group_id, size, group_id, uid, limit),
+        )
+        rows = cur.fetchall()
+    finally:
+        conn.close()
+
+    return [_to_message_dict(row) for row in reversed(rows)]
+
+
+def get_messages_by_keyword(
+    group_id: str,
+    keyword: str,
+    *,
+    pool_size: int = MAX_MESSAGES_PER_GROUP,
+    limit: int = 40,
+) -> list[dict]:
+    """Get recent messages that contain specific keyword in a group's pool."""
+    group_id = _normalize_group_id(group_id)
+    key = _normalize_text(keyword)
+    if not group_id or not key:
+        return []
+
+    size = _normalize_pool_size(pool_size)
+    limit = max(1, min(300, int(limit)))
+    pattern = f"%{key}%"
+
+    _ensure_db()
+    conn = _connect()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT m.id, m.message_id, m.group_id, m.user_id, m.user_name, m.ts, m.message,
+                   m.reply_to, m.at_list, m.message_type, m.length, m.has_image, m.has_face
+            FROM messages m
+            JOIN (
+                SELECT id
+                FROM messages
+                WHERE group_id = ?
+                ORDER BY ts DESC, id DESC
+                LIMIT ?
+            ) AS latest ON latest.id = m.id
+            WHERE m.group_id = ? AND lower(m.message) LIKE lower(?)
+            ORDER BY m.ts DESC, m.id DESC
+            LIMIT ?
+            """,
+            (group_id, size, group_id, pattern, limit),
+        )
+        rows = cur.fetchall()
+    finally:
+        conn.close()
+
+    return [_to_message_dict(row) for row in reversed(rows)]
+
+
+def get_messages_by_time(
+    group_id: str,
+    *,
+    start_ts: float | int,
+    end_ts: float | int,
+    pool_size: int = MAX_MESSAGES_PER_GROUP,
+    limit: int = 80,
+) -> list[dict]:
+    """Get messages inside a unix-time window for one group."""
+    group_id = _normalize_group_id(group_id)
+    if not group_id:
+        return []
+
+    try:
+        start = float(start_ts)
+        end = float(end_ts)
+    except (TypeError, ValueError):
+        return []
+    if end <= start:
+        return []
+
+    size = _normalize_pool_size(pool_size)
+    limit = max(1, min(300, int(limit)))
+
+    _ensure_db()
+    conn = _connect()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT m.id, m.message_id, m.group_id, m.user_id, m.user_name, m.ts, m.message,
+                   m.reply_to, m.at_list, m.message_type, m.length, m.has_image, m.has_face
+            FROM messages m
+            JOIN (
+                SELECT id
+                FROM messages
+                WHERE group_id = ?
+                ORDER BY ts DESC, id DESC
+                LIMIT ?
+            ) AS latest ON latest.id = m.id
+            WHERE m.group_id = ? AND m.ts BETWEEN ? AND ?
+            ORDER BY m.ts DESC, m.id DESC
+            LIMIT ?
+            """,
+            (group_id, size, group_id, start, end, limit),
+        )
+        rows = cur.fetchall()
+    finally:
+        conn.close()
+
+    return [_to_message_dict(row) for row in reversed(rows)]
 
 
 def get_latest_message_time(group_id: str) -> float | None:
@@ -745,6 +1121,182 @@ def _build_profile_rows(group_id: str, limit: int, order_by: str) -> list[dict]:
                 "last_active_day": int(row["last_active_day"] or 0),
             }
         )
+    return out
+
+
+def get_message_snapshot(group_id: str, message_id: str) -> dict | None:
+    """Return cached message row by group/message id."""
+    group_id = _normalize_group_id(group_id)
+    message_id = _normalize_text(message_id)
+    if not group_id or not message_id:
+        return None
+
+    _ensure_db()
+    conn = _connect()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT user_id, user_name, ts, message, reply_to, at_list, message_type
+            FROM messages
+            WHERE group_id = ? AND message_id = ?
+            ORDER BY id DESC
+            LIMIT 1
+            """,
+            (group_id, message_id),
+        )
+        row = cur.fetchone()
+    finally:
+        conn.close()
+
+    if not row:
+        return None
+
+    return {
+        "user_id": str(row["user_id"] or ""),
+        "user_name": row["user_name"] or "",
+        "timestamp": float(row["ts"] or 0),
+        "message": _normalize_text(row["message"] or ""),
+        "reply_to": str(row["reply_to"]) if row["reply_to"] is not None else "",
+        "at_list": _normalize_at_list(json.loads(str(row["at_list"])) if row["at_list"] else []),
+        "message_type": str(row["message_type"] or "group").strip() or "group",
+    }
+
+
+def get_top_words(group_id: str | None = None, limit: int = 20) -> list[dict]:
+    """Get top keywords by usage count in member_word_stats."""
+    limit = max(1, min(300, int(limit)))
+
+    if group_id is not None:
+        group_id = _normalize_group_id(group_id)
+        if not group_id:
+            return []
+
+    _ensure_db()
+    conn = _connect()
+    try:
+        cur = conn.cursor()
+        if group_id is None:
+            cur.execute(
+                """
+                SELECT token, SUM(count) as total_count
+                FROM member_word_stats
+                GROUP BY token
+                HAVING total_count > 0
+                ORDER BY total_count DESC, token ASC
+                LIMIT ?
+                """,
+                (limit,),
+            )
+        else:
+            cur.execute(
+                """
+                SELECT token, SUM(count) as total_count
+                FROM member_word_stats
+                WHERE group_id = ?
+                GROUP BY token
+                HAVING total_count > 0
+                ORDER BY total_count DESC, token ASC
+                LIMIT ?
+                """,
+                (group_id, limit),
+            )
+        rows = cur.fetchall()
+    finally:
+        conn.close()
+
+    out: list[dict] = []
+    for row in rows:
+        out.append({"token": str(row["token"]), "count": int(row["total_count"] or 0)})
+    return out
+
+
+def get_top_phrases(group_id: str | None = None, limit: int = 20) -> list[dict]:
+    scope = SCOPE_GLOBAL_TERMS if group_id is None else SCOPE_GROUP_TERMS
+    key = _normalize_group_id(group_id) if group_id is not None else GLOBAL_SCOPE
+    limit = max(1, min(300, int(limit)))
+
+    _ensure_db()
+    conn = _connect()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT token, count
+            FROM global_terms
+            WHERE scope = ? AND group_id = ? AND token_type = 'phrase'
+            ORDER BY count DESC, token ASC
+            LIMIT ?
+            """,
+            (scope, key, limit),
+        )
+        rows = cur.fetchall()
+    finally:
+        conn.close()
+
+    out: list[dict] = []
+    for row in rows:
+        out.append({"token": str(row["token"]), "count": int(row["count"] or 0)})
+    return out
+
+
+def get_top_fillers(group_id: str | None = None, limit: int = 20) -> list[dict]:
+    scope = SCOPE_GLOBAL_TERMS if group_id is None else SCOPE_GROUP_TERMS
+    key = _normalize_group_id(group_id) if group_id is not None else GLOBAL_SCOPE
+    limit = max(1, min(300, int(limit)))
+
+    _ensure_db()
+    conn = _connect()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT token, count
+            FROM global_terms
+            WHERE scope = ? AND group_id = ? AND token_type = 'filler'
+            ORDER BY count DESC, token ASC
+            LIMIT ?
+            """,
+            (scope, key, limit),
+        )
+        rows = cur.fetchall()
+    finally:
+        conn.close()
+
+    out: list[dict] = []
+    for row in rows:
+        out.append({"token": str(row["token"]), "count": int(row["count"] or 0)})
+    return out
+
+
+def get_user_words(group_id: str, user_id: str, limit: int = 20) -> list[dict]:
+    group_id = _normalize_group_id(group_id)
+    user_id = _normalize_user_id(user_id)
+    if not group_id or not user_id:
+        return []
+
+    limit = max(1, min(300, int(limit)))
+    _ensure_db()
+    conn = _connect()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT token, count
+            FROM member_word_stats
+            WHERE group_id = ? AND user_id = ?
+            ORDER BY count DESC, token ASC
+            LIMIT ?
+            """,
+            (group_id, user_id, limit),
+        )
+        rows = cur.fetchall()
+    finally:
+        conn.close()
+
+    out: list[dict] = []
+    for row in rows:
+        out.append({"token": str(row["token"]), "count": int(row["count"] or 0)})
     return out
 
 

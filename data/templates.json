@@ -1,9 +1,35 @@
 {
   "templates": [
-    "{speaker} 的发言在最近 {active_days} 天里比较稳定，当前互动强度 {message_count}。",
-    "{speaker} 最近常提到“{topic}”，更像是围绕这个方向在聊天。",
-    "看起来这个群里 {best_friend} 最近互动更频繁，{speaker} 的节奏也很活跃。",
-    "系统观测：{speaker} 在 {active_hour} 点最活跃，最近平均长度 {average_length} 字。",
-    "无token 下的回退回复：{speaker} 提示了“{topic}”，大家可以接着这个线索聊。"
+    {
+      "text": "{speaker} 的发言在最近 {active_days} 天里比较稳定，当前互动强度 {message_count}。",
+      "probability": 1.0
+    },
+    {
+      "text": "{speaker} 最近常提到“{topic}”，更像是围绕这个方向在聊天。",
+      "probability": 1.0,
+      "conditions": {
+        "topic_contains": ["考试", "上课", "作业", "项目"]
+      }
+    },
+    {
+      "text": "看起来这个群里 {best_friend} 最近互动更频繁，{speaker} 的节奏也很活跃。",
+      "probability": 1.0
+    },
+    {
+      "text": "系统观测：{speaker} 在 {active_hour} 点最活跃，最近平均长度 {average_length} 字。",
+      "probability": 1.0
+    },
+    {
+      "text": "无token 下的回退回复：{speaker} 提示了“{topic}”，大家可以接着这个线索聊。",
+      "probability": 0.35
+    },
+    {
+      "text": "你们最近最热的话题是 {top_words}，{speaker} 可以重点接话。",
+      "probability": 1.0
+    },
+    {
+      "text": "{speaker} 的热词是 {top_word}，你也可以顺着这个方向回应。",
+      "probability": 1.0
+    }
   ]
 }
