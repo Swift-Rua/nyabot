@@ -1420,7 +1420,7 @@
         }
       },
       "meta": {
-        "last_seen": "06-25 10:38"
+        "last_seen": "07-03 14:42"
       },
       "affinity": {},
       "aliases": []
@@ -1789,7 +1789,7 @@
         }
       },
       "meta": {
-        "last_seen": "06-25 11:38"
+        "last_seen": "07-03 14:41"
       },
       "affinity": {},
       "aliases": [
@@ -3116,9 +3116,9 @@
           "type": "acquaintance"
         },
         "764541761": {
-          "last_chat": "06-23 22:58",
-          "affinity": 20,
-          "interaction": 1,
+          "last_chat": "07-03 14:42",
+          "affinity": 22,
+          "interaction": 3,
           "type": "acquaintance"
         },
         "970082176": {
@@ -3144,11 +3144,17 @@
           "affinity": 51,
           "interaction": 1,
           "last_chat": "06-24 21:07"
+        },
+        "1065934983": {
+          "type": "acquaintance",
+          "affinity": 51,
+          "interaction": 1,
+          "last_chat": "07-03 14:42"
         }
       },
       "meta": {
         "impression": "外向跳脱型，喜欢草飞别人和搞事，群里的气氛制造机。",
-        "last_seen": "06-25 08:12"
+        "last_seen": "07-03 14:44"
       },
       "aliases": [
         "淫萎月狐",
@@ -4459,7 +4465,7 @@
         }
       },
       "meta": {
-        "last_seen": "06-25 11:52"
+        "last_seen": "07-03 14:44"
       },
       "affinity": {},
       "aliases": []
@@ -5047,7 +5053,7 @@
         }
       },
       "meta": {
-        "last_seen": "06-25 11:47"
+        "last_seen": "07-03 14:42"
       },
       "affinity": {},
       "aliases": []
@@ -5684,7 +5690,7 @@
         }
       },
       "meta": {
-        "last_seen": "06-25 02:34"
+        "last_seen": "07-03 14:41"
       },
       "affinity": {},
       "aliases": []
@@ -7582,7 +7588,7 @@
         }
       },
       "meta": {
-        "last_seen": "06-25 16:35"
+        "last_seen": "07-03 14:30"
       },
       "affinity": {},
       "aliases": []
@@ -8684,9 +8690,9 @@
           "type": "acquaintance"
         },
         "848129048": {
-          "last_chat": "06-25 14:14",
-          "affinity": 36,
-          "interaction": 20,
+          "last_chat": "07-03 14:41",
+          "affinity": 38,
+          "interaction": 22,
           "type": "acquaintance"
         },
         "2827439724": {
@@ -8943,9 +8949,9 @@
         },
         "761420475": {
           "type": "acquaintance",
-          "affinity": 52,
-          "interaction": 2,
-          "last_chat": "06-24 19:19"
+          "affinity": 53,
+          "interaction": 3,
+          "last_chat": "07-03 14:44"
         },
         "3434603116": {
           "type": "acquaintance",
@@ -8971,7 +8977,7 @@
         "identity": {
           "role": "self"
         },
-        "last_seen": "06-25 17:09"
+        "last_seen": "07-03 14:44"
       },
       "aliases": []
     },
@@ -10598,7 +10604,7 @@
       },
       "style": "普通用户",
       "meta": {
-        "last_seen": "06-24 17:06"
+        "last_seen": "07-03 14:35"
       },
       "relations": {
         "2952719573": {
@@ -12810,7 +12816,7 @@
       },
       "style": "A normal user style",
       "meta": {
-        "last_seen": "06-24 17:32"
+        "last_seen": "07-03 14:46"
       },
       "relations": {},
       "affinity": {},
@@ -13134,7 +13140,8 @@
           "last_chat": "06-24 17:28"
         }
       },
-      "affinity": {}
+      "affinity": {},
+      "aliases": []
     },
     "2460195341": {
       "name": "User2460195341",
@@ -13148,7 +13155,8 @@
         "last_seen": "06-24 17:29"
       },
       "relations": {},
-      "affinity": {}
+      "affinity": {},
+      "aliases": []
     },
     "357207470": {
       "name": "龙舟1=11",
@@ -13353,7 +13361,8 @@
         "last_seen": "06-24 18:25"
       },
       "relations": {},
-      "affinity": {}
+      "affinity": {},
+      "aliases": []
     },
     "1310413752": {
       "name": "四季丛雨",
@@ -13468,7 +13477,8 @@
         "last_seen": "06-24 19:11"
       },
       "relations": {},
-      "affinity": {}
+      "affinity": {},
+      "aliases": []
     },
     "1103865935": {
       "name": "nanxi",
@@ -13540,7 +13550,8 @@
         "last_seen": "06-24 19:27"
       },
       "relations": {},
-      "affinity": {}
+      "affinity": {},
+      "aliases": []
     },
     "3248561380": {
       "name": "User3248561380",
@@ -13554,7 +13565,8 @@
         "last_seen": "06-24 19:27"
       },
       "relations": {},
-      "affinity": {}
+      "affinity": {},
+      "aliases": []
     },
     "1182049570": {
       "name": "zxl",
@@ -13583,7 +13595,8 @@
         "last_seen": "06-24 19:31"
       },
       "relations": {},
-      "affinity": {}
+      "affinity": {},
+      "aliases": []
     },
     "1909970660": {
       "name": "pokemmo",
@@ -13634,7 +13647,8 @@
         "last_seen": "06-24 19:44"
       },
       "relations": {},
-      "affinity": {}
+      "affinity": {},
+      "aliases": []
     },
     "743270407": {
       "name": "醉里挑灯看剑",
@@ -13692,7 +13706,8 @@
         "last_seen": "06-24 20:14"
       },
       "relations": {},
-      "affinity": {}
+      "affinity": {},
+      "aliases": []
     },
     "3541007396": {
       "name": "qwertyuiop",
@@ -13718,7 +13733,7 @@
       },
       "style": "A normal user style",
       "meta": {
-        "last_seen": "06-25 08:45"
+        "last_seen": "07-03 14:47"
       },
       "relations": {
         "527802865": {
@@ -13795,7 +13810,8 @@
         "last_seen": "06-24 20:29"
       },
       "relations": {},
-      "affinity": {}
+      "affinity": {},
+      "aliases": []
     },
     "1578161038": {
       "name": "fanhua",
@@ -13852,7 +13868,8 @@
         "last_seen": "06-24 20:33"
       },
       "relations": {},
-      "affinity": {}
+      "affinity": {},
+      "aliases": []
     },
     "3100512507": {
       "name": "南河.",
@@ -13881,7 +13898,8 @@
         "last_seen": "06-25 08:45"
       },
       "relations": {},
-      "affinity": {}
+      "affinity": {},
+      "aliases": []
     },
     "2748695047": {
       "name": "猫七",
@@ -13980,7 +13998,8 @@
         "last_seen": "06-24 20:44"
       },
       "relations": {},
-      "affinity": {}
+      "affinity": {},
+      "aliases": []
     },
     "1346100861": {
       "name": "Ruler",
@@ -14037,7 +14056,8 @@
         "last_seen": "06-24 20:49"
       },
       "relations": {},
-      "affinity": {}
+      "affinity": {},
+      "aliases": []
     },
     "3395524458": {
       "name": "wtf",
@@ -14066,7 +14086,8 @@
         "last_seen": "06-24 21:04"
       },
       "relations": {},
-      "affinity": {}
+      "affinity": {},
+      "aliases": []
     },
     "3254871716": {
       "name": "祁白沭",
@@ -14124,7 +14145,8 @@
         "last_seen": "06-24 21:24"
       },
       "relations": {},
-      "affinity": {}
+      "affinity": {},
+      "aliases": []
     },
     "1743174872": {
       "name": "萌旧来了-息怒",
@@ -14320,7 +14342,8 @@
         "last_seen": "06-24 22:00"
       },
       "relations": {},
-      "affinity": {}
+      "affinity": {},
+      "aliases": []
     },
     "1402933288": {
       "name": "minghuai",
@@ -14545,7 +14568,8 @@
         "last_seen": "06-24 22:41"
       },
       "relations": {},
-      "affinity": {}
+      "affinity": {},
+      "aliases": []
     },
     "1608331359": {
       "name": "User1608331359",
@@ -14559,7 +14583,8 @@
         "last_seen": "06-24 22:43"
       },
       "relations": {},
-      "affinity": {}
+      "affinity": {},
+      "aliases": []
     },
     "2395631712": {
       "name": "冷牛",
@@ -14710,7 +14735,8 @@
         "last_seen": "06-24 23:24"
       },
       "relations": {},
-      "affinity": {}
+      "affinity": {},
+      "aliases": []
     },
     "2701352453": {
       "name": "FY_MapleLeaf",
@@ -14776,7 +14802,8 @@
         "last_seen": "06-24 23:34"
       },
       "relations": {},
-      "affinity": {}
+      "affinity": {},
+      "aliases": []
     },
     "980667052": {
       "name": "月家军-阿颜元帅",
@@ -14830,7 +14857,8 @@
         "last_seen": "06-25 00:00"
       },
       "relations": {},
-      "affinity": {}
+      "affinity": {},
+      "aliases": []
     },
     "1283346120": {
       "name": "AikawaMaria/YAcedia",
@@ -14887,7 +14915,8 @@
         "last_seen": "06-25 00:07"
       },
       "relations": {},
-      "affinity": {}
+      "affinity": {},
+      "aliases": []
     },
     "1813442638": {
       "name": "majyo-shion",
@@ -14929,7 +14958,8 @@
         "last_seen": "06-25 00:25"
       },
       "relations": {},
-      "affinity": {}
+      "affinity": {},
+      "aliases": []
     },
     "743936992": {
       "name": "laoda666",
@@ -14958,7 +14988,8 @@
         "last_seen": "06-25 00:29"
       },
       "relations": {},
-      "affinity": {}
+      "affinity": {},
+      "aliases": []
     },
     "1323251496": {
       "name": "User1323251496",
@@ -14972,7 +15003,8 @@
         "last_seen": "06-25 01:04"
       },
       "relations": {},
-      "affinity": {}
+      "affinity": {},
+      "aliases": []
     },
     "1908863849": {
       "name": "User1908863849",
@@ -14986,7 +15018,8 @@
         "last_seen": "06-25 01:08"
       },
       "relations": {},
-      "affinity": {}
+      "affinity": {},
+      "aliases": []
     },
     "1319167313": {
       "name": "User1319167313",
@@ -15000,7 +15033,8 @@
         "last_seen": "06-25 01:11"
       },
       "relations": {},
-      "affinity": {}
+      "affinity": {},
+      "aliases": []
     },
     "1305163880": {
       "name": "Ephreal",
@@ -15063,7 +15097,8 @@
         "last_seen": "06-25 01:21"
       },
       "relations": {},
-      "affinity": {}
+      "affinity": {},
+      "aliases": []
     },
     "2858455420": {
       "name": "User2858455420",
@@ -15077,7 +15112,8 @@
         "last_seen": "06-25 01:23"
       },
       "relations": {},
-      "affinity": {}
+      "affinity": {},
+      "aliases": []
     },
     "3840443173": {
       "name": "LinRuei_0630",
@@ -15134,7 +15170,8 @@
         "last_seen": "06-25 02:19"
       },
       "relations": {},
-      "affinity": {}
+      "affinity": {},
+      "aliases": []
     },
     "3082745811": {
       "name": "ad不是粽子",
@@ -15193,7 +15230,8 @@
         "last_seen": "06-25 05:03"
       },
       "relations": {},
-      "affinity": {}
+      "affinity": {},
+      "aliases": []
     },
     "1035984064": {
       "name": "User1035984064",
@@ -15207,7 +15245,8 @@
         "last_seen": "06-25 05:52"
       },
       "relations": {},
-      "affinity": {}
+      "affinity": {},
+      "aliases": []
     },
     "382236423": {
       "name": "User382236423",
@@ -15221,7 +15260,8 @@
         "last_seen": "06-25 07:20"
       },
       "relations": {},
-      "affinity": {}
+      "affinity": {},
+      "aliases": []
     },
     "2282631280": {
       "name": "神の痞颜",
@@ -15327,7 +15367,8 @@
         "last_seen": "06-25 09:03"
       },
       "relations": {},
-      "affinity": {}
+      "affinity": {},
+      "aliases": []
     },
     "764969287": {
       "name": "团长我是小牛呀",
@@ -15450,7 +15491,8 @@
         "last_seen": "06-25 10:23"
       },
       "relations": {},
-      "affinity": {}
+      "affinity": {},
+      "aliases": []
     },
     "592077787": {
       "name": "叶不牛",
@@ -15479,7 +15521,8 @@
         "last_seen": "06-25 10:45"
       },
       "relations": {},
-      "affinity": {}
+      "affinity": {},
+      "aliases": []
     },
     "2074219749": {
       "name": "神秘博库男",
@@ -15567,7 +15610,8 @@
         "last_seen": "06-25 11:21"
       },
       "relations": {},
-      "affinity": {}
+      "affinity": {},
+      "aliases": []
     },
     "3087109772": {
       "name": "北辰观",
@@ -15603,7 +15647,8 @@
           "last_chat": "06-25 11:35"
         }
       },
-      "affinity": {}
+      "affinity": {},
+      "aliases": []
     },
     "1911735906": {
       "name": "User1911735906",
@@ -15617,7 +15662,8 @@
         "last_seen": "06-25 11:37"
       },
       "relations": {},
-      "affinity": {}
+      "affinity": {},
+      "aliases": []
     },
     "2061282405": {
       "name": "💱",
@@ -15646,7 +15692,8 @@
         "last_seen": "06-25 12:03"
       },
       "relations": {},
-      "affinity": {}
+      "affinity": {},
+      "aliases": []
     },
     "3485539125": {
       "name": "零之景",
@@ -15700,7 +15747,8 @@
         "last_seen": "06-25 13:08"
       },
       "relations": {},
-      "affinity": {}
+      "affinity": {},
+      "aliases": []
     },
     "1351194782": {
       "name": "miinhuuo",
@@ -15729,7 +15777,8 @@
         "last_seen": "06-25 13:19"
       },
       "relations": {},
-      "affinity": {}
+      "affinity": {},
+      "aliases": []
     },
     "2524057618": {
       "name": "猫猫",
@@ -15765,7 +15814,8 @@
         "last_seen": "06-25 13:31"
       },
       "relations": {},
-      "affinity": {}
+      "affinity": {},
+      "aliases": []
     },
     "3060227151": {
       "name": "天堂在左，战士往右",
@@ -15835,7 +15885,8 @@
         "last_seen": "06-25 15:20"
       },
       "relations": {},
-      "affinity": {}
+      "affinity": {},
+      "aliases": []
     },
     "1151928544": {
       "name": "冰黑鸡",
@@ -16000,7 +16051,8 @@
         "last_seen": "06-25 16:06"
       },
       "relations": {},
-      "affinity": {}
+      "affinity": {},
+      "aliases": []
     },
     "2754448974": {
       "name": "回忆、提莫",
@@ -16036,7 +16088,8 @@
         "last_seen": "06-25 16:18"
       },
       "relations": {},
-      "affinity": {}
+      "affinity": {},
+      "aliases": []
     },
     "89010126": {
       "name": "404",
@@ -16103,6 +16156,20 @@
       },
       "affinity": {},
       "aliases": []
+    },
+    "1219460543": {
+      "name": "User1219460543",
+      "tags": {
+        "core": [],
+        "interest": [],
+        "behavior": []
+      },
+      "style": "A normal user style",
+      "meta": {
+        "last_seen": "07-03 14:44"
+      },
+      "relations": {},
+      "affinity": {}
     }
   }
 }
