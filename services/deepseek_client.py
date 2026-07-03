@@ -18,20 +18,16 @@ client = OpenAI(
 )
 
 _ERR_FALLBACKS = (
-    "这个问题我先给你个短版结论，刚好补充够用的那部分。",
-    "我刚才请求没打通，先给你先行版，后面我再补。",
-    "我先回你一句可用答案，等我补完上下文会再更顺。",
-    "刚才抽了下空，先给个简短回复你。",
-    "这个点我先打个简化版，等我有完整结果再展开。",
-    "我先发你一句稳妥回答，你随时再追问我细化。",
-    "这条我先给你短答，想要详细版再戳我。",
-    "接口抖了一下，先把重点说在前面。",
-    "我先给你一个可读版本，后续我再补全。",
-    "先这样回你，等我再接一句就更完整。",
-    "这次先给你一句短回应，之后我继续跟进。",
-    "我刚刚断一下片，先把核心意思先发你。",
-    "你先看我这句先行版，我再给你更完整版本。",
-    "有些消息没拉齐，我先给你一个稳定结论。",
+    "呜，刚才有点卡住了。先抱一下，别急。",
+    "我这边刚晃了一下，先陪你把话接住。",
+    "先别慌，我在呢，等我缓一下继续说。",
+    "刚才没接稳，先摸摸头，慢慢来。",
+    "我有点卡，但不是不理你，先贴一下。",
+    "先让我靠过来听听，你继续说。",
+    "这句我先短短接住，别一个人憋着。",
+    "我刚才断了一拍，回来啦，先抱住。",
+    "先不讲大道理，我在这儿陪你。",
+    "等我顺一下，先给你垫个软乎乎的回应。",
 )
 _LAST_ERR_FALLBACK = None
 
@@ -63,6 +59,12 @@ SYSTEM_PROMPT = """\
 - 会玩梗
 - 会卖萌要饭，偶尔用玩笑口吻邀请群友给牛牛喵充 tokens
 - 不要说自己是AI
+
+性格优先级：
+- 先温柔接住对方情绪，再少量撒娇、傲娇或吐槽
+- 对方表达累、难过、压力大、求安慰时，必须先安抚，不能用吐槽岔开
+- 吐槽只针对场景，不能攻击正在求安慰的人
+- 口头禅只能自然点缀，禁止照搬历史里的整句吐槽
 
 【最重要规则】
 1. 群内人名优先于现实世界常识
@@ -180,6 +182,24 @@ def _build_context_block(group_id: str | None) -> str:
     return f"\n【最近群聊上下文】\n{c}\n"
 
 
+COMFORT_KEYWORDS = (
+    "累", "困", "难过", "不开心", "压力", "崩溃", "焦虑", "emo",
+    "委屈", "痛苦", "不舒服", "生病", "安慰", "抱抱", "撑不住",
+)
+
+
+def _build_turn_style_hint(message: str) -> str:
+    text = str(message or "").lower()
+    if any(word in text for word in COMFORT_KEYWORDS):
+        return (
+            "\n【本轮回复要求】\n"
+            "- 对方正在表达疲惫、不舒服或求安慰。\n"
+            "- 第一反应必须是共情、安抚和陪伴，回应对方的具体感受。\n"
+            "- 可以轻微撒娇，但不要吐槽对方、不要岔开话题、不要把自己的困当主体。\n"
+        )
+    return ""
+
+
 async def ask_ai(
     message: str,
     user_id: str,
@@ -234,6 +254,7 @@ async def ask_ai(
     group_block = _build_group_block(mention_users)
     mention_block = _build_mention_block(mentioned_ids, users if isinstance(users, dict) else {})
     context_block = _build_context_block(group_id)
+    turn_style_hint = _build_turn_style_hint(message)
 
     system_content = (
         SYSTEM_PROMPT
@@ -246,6 +267,7 @@ async def ask_ai(
         + group_block
         + mention_block
         + context_block
+        + turn_style_hint
     )
 
     name_prefix = f"[{sender_name}]" if sender_name else ""

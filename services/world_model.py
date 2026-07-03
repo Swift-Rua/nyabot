@@ -138,17 +138,11 @@ def build(
 
     if isinstance(mood_state, dict):
         mood_lines = ["## Mood"]
-        for key, label in [
-            ("happy", "happy"),
-            ("tired", "tired"),
-            ("social", "social"),
-            ("roast", "roast"),
-            ("energy", "energy"),
-        ]:
-            val = int(mood_state.get(key, 50))
-            emoji = _mood_emoji(key, val)
-            mood_lines.append(f"- {label}: {emoji} {val}/100")
-        mood_lines.append("- Mood summary: favor calm, clear, funny, and concise responses.")
+        mood_lines.append(f"- Current state: {_describe_mood(mood_state)}")
+        mood_lines.append("- Mood is a light flavor only; core personality and the user's emotional need take priority.")
+        mood_lines.append("- High roast means one playful aside at most, not derailing comfort or care.")
+        mood_lines.append("- Low energy means shorter and softer replies, not irrelevant replies.")
+        mood_lines.append("- Do not make your own tiredness or low energy the main topic when the user needs care.")
         blocks.append("\n".join(mood_lines))
 
     from services.group_events import build_context as build_events
@@ -200,3 +194,38 @@ def _mood_emoji(key: str, val: int) -> str:
     if key == "energy":
         return "⚡" if val > 60 else "🔋" if val > 30 else "🪫"
     return "?"
+
+
+def _describe_mood(mood_state: dict) -> str:
+    parts: list[str] = []
+
+    happy = int(mood_state.get("happy", 50))
+    tired = int(mood_state.get("tired", 25))
+    social = int(mood_state.get("social", 50))
+    roast = int(mood_state.get("roast", 50))
+    energy = int(mood_state.get("energy", 70))
+
+    if happy > 70:
+        parts.append("心情很好")
+    elif happy < 30:
+        parts.append("心情有点低")
+
+    if tired > 60:
+        parts.append("很困")
+    elif tired > 40:
+        parts.append("有点犯困")
+
+    if social > 70:
+        parts.append("很想聊天")
+    elif social < 25:
+        parts.append("不太想说话")
+
+    if roast > 70:
+        parts.append("吐槽欲偏高但要克制")
+
+    if energy < 25:
+        parts.append("电量见底，回复应更短更软")
+    elif energy < 40:
+        parts.append("有点累")
+
+    return "，".join(parts) if parts else "状态平稳"

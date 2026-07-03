@@ -62,6 +62,18 @@ class RegressionTests(unittest.TestCase):
         self.assertIn("不要施压、不要刷屏", deepseek_source)
         self.assertIn("卖萌要饭", personality_source)
 
+    def test_contextual_catchphrases_do_not_override_persona(self):
+        from services.deepseek_client import _build_turn_style_hint
+        from services.nya_personality import _is_reusable_catchphrase
+
+        self.assertFalse(_is_reusable_catchphrase("（探头）搁这学白喵卖萌呢你？"))
+        self.assertFalse(_is_reusable_catchphrase("那你倒是说啊，搁这吊胃口呢。"))
+        self.assertTrue(_is_reusable_catchphrase("喵~"))
+
+        hint = _build_turn_style_hint("我今天有点累，你安慰我一下")
+        self.assertIn("第一反应必须是共情", hint)
+        self.assertIn("不要吐槽对方", hint)
+
 
 if __name__ == "__main__":
     unittest.main()

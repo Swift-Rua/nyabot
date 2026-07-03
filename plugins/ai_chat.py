@@ -43,6 +43,13 @@ DEFAULT_REPLY_PROB = 0.2
 SILENT_DURATION_SECONDS = 12 * 60 * 60
 MUTE_CMD = "牛牛喵闭嘴！"
 UNMUTE_CMD = "牛牛喵归来！"
+ADMIN_CONTROL_COMMANDS = {
+    "bot mute 12h",
+    MUTE_CMD,
+    UNMUTE_CMD,
+    "bot reply 10%",
+    "bot reply default",
+}
 CALL_KEYWORDS = ("牛牛喵", "猫猫", "喵", "meow", "@牛牛喵")
 
 SYSTEM_HINT = (
@@ -283,32 +290,33 @@ async def _(event: GroupMessageEvent):
     record_message(group_id, user_name, text)
     gate.set_group_default_prob(group_id, get_group_default_reply_prob(group_id, DEFAULT_REPLY_PROB))
 
+    if text in ADMIN_CONTROL_COMMANDS:
+        if text == "bot mute 12h":
+            _GROUP_MUTE_UNTIL[group_id] = time.time() + SILENT_DURATION_SECONDS
+            _FOLLOWUP_REPLY_LEFT.pop(group_id, None)
+            await chat.finish("Got it. I will stay quiet for 12h.")
+
+        if text == MUTE_CMD:
+            _GROUP_MUTE_UNTIL[group_id] = time.time() + SILENT_DURATION_SECONDS
+            _FOLLOWUP_REPLY_LEFT.pop(group_id, None)
+            await chat.finish("好，我会安静12小时喵，不会主动说话。")
+
+        if text == UNMUTE_CMD:
+            _GROUP_MUTE_UNTIL.pop(group_id, None)
+            _FOLLOWUP_REPLY_LEFT.pop(group_id, None)
+            await chat.finish("喵喵回来了，解除12小时静音。")
+
+        if text == "bot reply 10%":
+            gate.set_group_reply_prob(group_id, 0.10)
+            await chat.finish("Reply probability set to 10%.")
+
+        if text == "bot reply default":
+            gate.reset_group_reply_prob(group_id)
+            _GROUP_MUTE_UNTIL.pop(group_id, None)
+            await chat.finish("Reply probability restored to default.")
+
     if _is_control_command(text):
         return
-
-    if text == "bot mute 12h":
-        _GROUP_MUTE_UNTIL[group_id] = time.time() + SILENT_DURATION_SECONDS
-        _FOLLOWUP_REPLY_LEFT.pop(group_id, None)
-        await chat.finish("Got it. I will stay quiet for 12h.")
-
-    if text == MUTE_CMD:
-        _GROUP_MUTE_UNTIL[group_id] = time.time() + SILENT_DURATION_SECONDS
-        _FOLLOWUP_REPLY_LEFT.pop(group_id, None)
-        await chat.finish("好，我会安静12小时喵，不会主动说话。")
-
-    if text == UNMUTE_CMD:
-        _GROUP_MUTE_UNTIL.pop(group_id, None)
-        _FOLLOWUP_REPLY_LEFT.pop(group_id, None)
-        await chat.finish("喵喵回来了，解除12小时静音。")
-
-    if text == "bot reply 10%":
-        gate.set_group_reply_prob(group_id, 0.10)
-        await chat.finish("Reply probability set to 10%.")
-
-    if text == "bot reply default":
-        gate.reset_group_reply_prob(group_id)
-        _GROUP_MUTE_UNTIL.pop(group_id, None)
-        await chat.finish("Reply probability restored to default.")
 
     mentioned_ids = list(set(at_ids + resolve_mentions(text)))
     if mentioned_ids:

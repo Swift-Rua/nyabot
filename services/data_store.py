@@ -232,7 +232,7 @@ def _new_user(user_id: str) -> dict:
     return {
         "name": f"User{user_id}",
         "tags": {"core": [], "interest": [], "behavior": []},
-        "style": "A normal user style",
+        "style": "新用户",
         "meta": {},
         "relations": {},
         "affinity": {},

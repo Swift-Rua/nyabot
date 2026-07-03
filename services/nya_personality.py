@@ -6,6 +6,7 @@ import json
 import os
 import time
 import random
+import re
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 NYA_FILE = os.path.join(BASE_DIR, "data", "nya_memory.json")
@@ -31,6 +32,11 @@ FALLBACK_CATCHPHRASES = [
     "草", "确实", "没毛病", "噗", "绝了",
 ]
 
+CONTEXTUAL_CATCHPHRASE_HINTS = (
+    "你", "他", "她", "啥", "什么", "让我", "康康", "搁这", "学",
+    "吊胃口", "牌子", "队友", "摩斯", "电报",
+)
+
 
 def load() -> dict:
     if not os.path.exists(NYA_FILE):
@@ -53,6 +59,29 @@ def save(data: dict):
     os.makedirs(os.path.dirname(NYA_FILE), exist_ok=True)
     with open(NYA_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
+
+
+def _is_reusable_catchphrase(text: str) -> bool:
+    """只保留短小、可复用的语气词，避免把整句吐槽当口头禅注入。"""
+    clean = str(text or "").strip()
+    if not (1 <= len(clean) <= 8):
+        return False
+    if re.search(r"[?？]", clean):
+        return False
+    if any(hint in clean for hint in CONTEXTUAL_CATCHPHRASE_HINTS):
+        return False
+    return True
+
+
+def _recent_reusable_catchphrases(data: dict, limit: int = 5) -> list[str]:
+    phrases = [
+        str(item).strip()
+        for item in data.get("catchphrases", [])
+        if _is_reusable_catchphrase(str(item))
+    ]
+    if not phrases:
+        phrases = list(DEFAULT["catchphrases"])
+    return phrases[-limit:]
 
 
 # ═══════════════════════════════════════════
@@ -84,7 +113,7 @@ def learn_catchphrase(text: str):
     """如果 AI 说出了新的短句（5~15 字），收录为口头禅候选"""
     data = load()
     clean = text.strip()
-    if 5 <= len(clean) <= 15 and clean not in data["catchphrases"]:
+    if _is_reusable_catchphrase(clean) and clean not in data["catchphrases"]:
         data["catchphrases"].append(clean)
         # 最多保留 20 个口头禅
         if len(data["catchphrases"]) > 20:
@@ -113,7 +142,7 @@ def build_self_block() -> str:
     data = load()
 
     likes = data.get("likes", [])
-    catchphrases = data.get("catchphrases", [])[-5:]  # 最近的口头禅
+    catchphrases = _recent_reusable_catchphrases(data)
     topics = data.get("topics_discussed", {})
 
     # 最近最热话题 Top 3
@@ -125,6 +154,12 @@ def build_self_block() -> str:
         f"  喜欢: {'、'.join(likes)}",
         f"  口头禅: {' '.join(catchphrases)}",
         f"  最近关注的话题: {topic_str}",
+        "",
+        "  当前性格优先级：",
+        "  - 先照顾人、接住情绪，再少量傲娇或吐槽。",
+        "  - 对方累、难过、求安慰、压力大时，优先温柔安抚，不要怼人或岔开话题。",
+        "  - 吐槽只能当轻微点缀，不能盖过关心。",
+        "  - 口头禅只偶尔点一下，禁止照搬整句旧回复。",
         "",
         "  关于自己：",
         "  - 你是牛牛喵，一个真实的QQ群友。",

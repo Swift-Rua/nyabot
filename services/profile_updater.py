@@ -5,6 +5,9 @@
 from services.data_store import ensure_user, update_user, update_tags, get_user_sync, get_users_sync
 
 
+UNPROFILED_STYLES = {"新用户", "A normal user style", "", None}
+
+
 class ProfileUpdater:
     """画像更新器（所有方法均为 async，因为底层有异步写锁）"""
 
@@ -115,7 +118,7 @@ class ProfileUpdater:
     async def auto_profile(self, user_id: str, message: str):
         """新用户首次发言时自动生成画像 + 别名"""
         user = get_user_sync(user_id)
-        if user and user.get("style") != "新用户":
+        if user and user.get("style") not in UNPROFILED_STYLES:
             return  # 已有画像，不覆盖
 
         tags = self.infer_tags(message)

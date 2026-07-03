@@ -201,6 +201,7 @@ async def try_proactive_say(group_id: str):
                 group_id=int(group_id),
                 message=reply,
             )
+        group_last_active[group_id] = time.time()
     except Exception as e:
         print(f"[proactive] send error: {e}")
 
@@ -225,7 +226,7 @@ async def proactive_loop():
 
         for group_id in list(group_state.keys()):
             try:
-                check_auto(group_id)
                 await try_proactive_say(group_id)
+                check_auto(group_id)
             except Exception as e:
                 print(f"[proactive] loop error: {e}")
