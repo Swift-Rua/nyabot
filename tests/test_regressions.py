@@ -53,6 +53,15 @@ class RegressionTests(unittest.TestCase):
         unmute_group("test")
         self.assertFalse(is_group_muted("test"))
 
+    def test_persona_prompt_has_token_begging_mama_style(self):
+        deepseek_source = (ROOT / "services" / "deepseek_client.py").read_text(encoding="utf-8")
+        personality_source = (ROOT / "services" / "nya_personality.py").read_text(encoding="utf-8")
+
+        self.assertIn("成年可爱妈妈系", deepseek_source)
+        self.assertIn("充 tokens", deepseek_source)
+        self.assertIn("不要施压、不要刷屏", deepseek_source)
+        self.assertIn("卖萌要饭", personality_source)
+
 
 if __name__ == "__main__":
     unittest.main()
