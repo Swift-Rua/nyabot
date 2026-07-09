@@ -32,6 +32,7 @@ from services.sticker import (
     collect_from_event,
     detect as sticker_detect,
     face_to_text,
+    is_rich_reply_enabled,
     reply_to_sticker,
     reply_with_sticker,
 )
@@ -184,6 +185,10 @@ async def _send_text_or_voice(group_id: str, text: str):
 
 
 async def _send_reply(group_id: str, text: str, event):
+    if not is_rich_reply_enabled():
+        await _send_text_or_voice(group_id, text)
+        return
+
     st_info = sticker_detect(event)
     if st_info.get("has_sticker") and not event.get_plaintext().strip():
         sticker_seg = reply_to_sticker(event)

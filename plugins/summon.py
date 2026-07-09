@@ -4,6 +4,7 @@
 import time
 from nonebot import on_message
 from nonebot.adapters.onebot.v11 import GroupMessageEvent
+from services.tts import is_voice_record_enabled
 
 summon = on_message(priority=1, block=False)
 
@@ -76,6 +77,9 @@ async def _(event: GroupMessageEvent):
         await summon.finish("💤回纸箱睡觉了～")
 
     if text == "牛牛喵 语音模式":
+        if not is_voice_record_enabled():
+            group_voice_mode[group_id] = False
+            await summon.finish("语音发送暂时关闭，先保持文字模式喵。")
         group_voice_mode[group_id] = True
         await summon.finish("🔊 切换为语音模式啦~")
 

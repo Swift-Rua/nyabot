@@ -19,6 +19,13 @@ VOICE_MAX_DAYS = 2
 VOICE = "zh-CN-XiaoxiaoNeural"   # Edge 免费唯一中文女声
 RATE = "-12%"                     # 稍慢，温柔宠溺
 PITCH = "+18Hz"                   # 高音调，幼态萝莉感
+VOICE_RECORD_ENV = "NYABOT_ENABLE_VOICE_RECORD"
+_TRUE_VALUES = {"1", "true", "yes", "on"}
+
+
+def is_voice_record_enabled() -> bool:
+    """NapCat/QQNT 对 mp3 语音兼容不稳定，默认关闭 record 发送。"""
+    return os.getenv(VOICE_RECORD_ENV, "").strip().lower() in _TRUE_VALUES
 
 
 def _cleanup_voice_cache():
@@ -93,9 +100,16 @@ async def send_voice_reply(group_id: int, text: str):
     """
     以语音条形式发送回复（TTS 失败则退化为文字）。
     """
-    filepath = await text_to_speech(text)
-
     bot = get_bot()
+    if not is_voice_record_enabled():
+        print(f"[TTS] voice record disabled by {VOICE_RECORD_ENV}; send text instead")
+        await bot.send_group_msg(
+            group_id=group_id,
+            message=text,
+        )
+        return
+
+    filepath = await text_to_speech(text)
 
     if filepath:
         # file:// URI 格式，正斜杠
