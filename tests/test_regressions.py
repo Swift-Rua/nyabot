@@ -1,4 +1,3 @@
-import os
 import unittest
 from pathlib import Path
 
@@ -53,30 +52,6 @@ class RegressionTests(unittest.TestCase):
 
         unmute_group("test")
         self.assertFalse(is_group_muted("test"))
-
-    def test_napcat_risky_media_sends_default_off(self):
-        from services.sticker import is_rich_reply_enabled
-        from services.tts import is_voice_record_enabled
-
-        old_voice = os.environ.pop("NYABOT_ENABLE_VOICE_RECORD", None)
-        old_rich = os.environ.pop("NYABOT_ENABLE_RICH_REPLY", None)
-        try:
-            self.assertFalse(is_voice_record_enabled())
-            self.assertFalse(is_rich_reply_enabled())
-
-            os.environ["NYABOT_ENABLE_VOICE_RECORD"] = "1"
-            os.environ["NYABOT_ENABLE_RICH_REPLY"] = "true"
-            self.assertTrue(is_voice_record_enabled())
-            self.assertTrue(is_rich_reply_enabled())
-        finally:
-            if old_voice is not None:
-                os.environ["NYABOT_ENABLE_VOICE_RECORD"] = old_voice
-            else:
-                os.environ.pop("NYABOT_ENABLE_VOICE_RECORD", None)
-            if old_rich is not None:
-                os.environ["NYABOT_ENABLE_RICH_REPLY"] = old_rich
-            else:
-                os.environ.pop("NYABOT_ENABLE_RICH_REPLY", None)
 
     def test_persona_prompt_has_token_begging_mama_style(self):
         deepseek_source = (ROOT / "services" / "deepseek_client.py").read_text(encoding="utf-8")

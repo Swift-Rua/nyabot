@@ -37,13 +37,6 @@ _HTTP_HEADERS = {
     "Referer": "https://qq.com/",
 }
 _HTTP_TIMEOUT = aiohttp.ClientTimeout(total=15)
-RICH_REPLY_ENV = "NYABOT_ENABLE_RICH_REPLY"
-_TRUE_VALUES = {"1", "true", "yes", "on"}
-
-
-def is_rich_reply_enabled() -> bool:
-    """自动贴纸/本地图片回复默认关闭，避免 NapCat 富媒体发送失败。"""
-    return os.getenv(RICH_REPLY_ENV, "").strip().lower() in _TRUE_VALUES
 
 
 def _get_session() -> aiohttp.ClientSession:
