@@ -3,22 +3,11 @@ AI 閼奉亜濮╅崡鎷岃杽閺囧瓨鏌?閳?鐎规碍婀￠崚鍡樼€界紘
 娴ｆ粈璐熼崥搴″酱娴犺濮熸潻鎰攽閿涘奔绗夐梼璇差敚濞戝牊浼呮径鍕倞閵?
 """
 import asyncio
-import os
-from openai import OpenAI
-from dotenv import load_dotenv
 
 from services.data_store import get_users_sync, update_user
 from services.context_compressor import compress
+from services.chatgpt_api import generate_text
 from plugins.summon import group_state
-
-load_dotenv()
-
-_client = OpenAI(
-    api_key=os.getenv("DEEPSEEK_API_KEY"),
-    base_url=os.getenv("DEEPSEEK_BASE_URL"),
-    timeout=10.0,
-    max_retries=0,
-)
 
 IMPRESSION_PROMPT = """\
 娴ｇ姵妲哥紘銈堜喊閸掑棙鐎介崝鈺傚閵嗗倸鐔€娴滃簼浜掓稉瀣付鏉╂垼浜版径鈺勵唶瑜版洩绱濋崚妤€鍤崗鏈佃厬閹绘劕鍩岄惃鍕槨娑擃亙姹夐敍宀€鏁ゆ稉鈧崣銉よ厬閺傚洦顩ч幏顑跨稑娴滃棜袙閸掓壆娈戦弬棰佷繆閹垬鈧?
@@ -47,28 +36,15 @@ async def update_impressions(group_id: str):
         return  # 娑撳﹣绗呴弬鍥с亰閻叏绱濇稉宥呭瀻閺?
 
     try:
-        def _request_sync():
-            return _client.chat.completions.create(
-                model=os.getenv("MODEL", "deepseek-chat"),
-                messages=[
-                    {"role": "system", "content": IMPRESSION_PROMPT},
-                    {"role": "user", "content": f"鑱婂ぉ璁板綍锛歕n{ctx}"},
-                ],
-                temperature=0.5,
-                max_tokens=300,
-            )
-
-        response = await asyncio.wait_for(asyncio.to_thread(_request_sync), timeout=8)
+        text = await asyncio.wait_for(
+            generate_text(IMPRESSION_PROMPT, f"Recent group context:\n{ctx}"),
+            timeout=55,
+        )
     except asyncio.TimeoutError:
         print(f"[impression] AI timeout for group={group_id}")
         return
     except Exception as e:
-        print(f"[impression] AI error: {e}")
-        return
-    try:
-        text = response.choices[0].message.content or ""
-    except Exception as e:
-        print(f"[impression] AI parse error: {e}")
+        print(f"[impression] ChatGPT error: {e}")
         return
 
     # 鐟欙絾鐎介敍姘槨鐞?"閸氬秴鐡閸楁媽钖?

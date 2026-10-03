@@ -6,6 +6,7 @@ __pycache__/
 .Python
 build/
 dist/
+*.egg-info/
 .env
 .env.prod
 .DS_Store
@@ -13,3 +14,8 @@ dist/
 data/setu/
 data/stickers/
 data/voice/
+data/*.db
+data/chatgpt_auth.json
+data/chatgpt_auth.lock
+data/chatgpt_credentials.dpapi
+data/chatgpt_credentials.dpapi.tmp

@@ -1,23 +1,15 @@
 """
-DeepSeek AI 客户端：统一上下文构建 + API 调用。
+AI 客户端：统一上下文构建 + ChatGPT 订阅 API 调用。
 接入统一数据层 + 上下文压缩器，是 AI 请求唯一出口。
 """
-import os
 import random
 import asyncio
 
-from dotenv import load_dotenv
-from openai import OpenAI
-
 from services.context_compressor import compress as compress_context
-
-load_dotenv()
-
-client = OpenAI(
-    api_key=os.getenv("DEEPSEEK_API_KEY"),
-    base_url=os.getenv("DEEPSEEK_BASE_URL"),
-    timeout=10.0,
-    max_retries=0,
+from services.chatgpt_api import (
+    ChatGPTAuthRequiredError,
+    ChatGPTPlanLimitError,
+    generate_text,
 )
 
 _ERR_FALLBACKS = (
@@ -53,6 +45,9 @@ def was_last_ai_call_no_tokens() -> bool:
 
 def _classify_ai_error(error: Exception) -> str:
     msg = str(error).lower()
+
+    if isinstance(error, (ChatGPTAuthRequiredError, ChatGPTPlanLimitError)):
+        return "no_tokens"
 
     status = getattr(error, "status_code", None)
     if status in (402,):
@@ -229,21 +224,11 @@ async def ask_ai(
     mood_state: dict | None = None,
 ) -> str:
     """
-    调用 DeepSeek API。
+    调用 ChatGPT 订阅授权的 Responses API。
     通过 World Model 统一构建认知状态，一次性注入 Prompt。
     """
     from services.world_model import build as build_world
     from services.data_store import get_users_sync
-
-    if not os.getenv("DEEPSEEK_API_KEY"):
-        print("[AI] missing DEEPSEEK_API_KEY")
-        _set_ai_status("no_tokens")
-        return _fallback_reply()
-
-    if not os.getenv("DEEPSEEK_BASE_URL"):
-        print("[AI] missing DEEPSEEK_BASE_URL")
-        _set_ai_status("no_tokens")
-        return _fallback_reply()
 
     # 世界观上下文
     world = build_world(
@@ -293,25 +278,17 @@ async def ask_ai(
     user_content = f"{name_prefix}: {message}" if name_prefix else message
 
     try:
-        def _request_sync():
-            return client.chat.completions.create(
-                model=os.getenv("MODEL", "deepseek-chat"),
-                messages=[
-                    {"role": "system", "content": system_content},
-                    {"role": "user", "content": user_content},
-                ],
-                temperature=1.1,
-            )
-
-        response = await asyncio.wait_for(asyncio.to_thread(_request_sync), timeout=8)
-        reply = (response.choices[0].message.content or "").strip()
+        reply = await asyncio.wait_for(
+            generate_text(system_content, user_content),
+            timeout=55,
+        )
         _set_ai_status("ok")
         return reply or _fallback_reply()
     except asyncio.TimeoutError:
-        _set_ai_status("no_tokens")
-        print("[AI] deepseek ask timeout")
+        _set_ai_status("error")
+        print("[AI] ChatGPT request timed out")
         return _fallback_reply()
     except Exception as e:
         _set_ai_status(_classify_ai_error(e))
-        print(f"[AI] deepseek ask failed: {type(e).__name__}: {e}")
+        print(f"[AI] ChatGPT request failed: {type(e).__name__}: {e}")
         return _fallback_reply()

@@ -4,6 +4,7 @@
 import os
 import random
 import glob
+import asyncio
 
 from nonebot import on_message, get_bot
 from nonebot.adapters.onebot.v11 import GroupMessageEvent, MessageSegment
@@ -15,6 +16,12 @@ setu = on_message(priority=5, block=False)
 
 # 最近发送的图片消息 ID（用于撤回）
 _recent_images: list[dict] = []  # [{group_id, message_id}]
+_recall_lock = asyncio.Lock()
+_image_batch_lock = asyncio.Lock()
+_RECALL_TIMEOUT_SECONDS = 8
+_NOTICE_TIMEOUT_SECONDS = 15
+_RECALL_CONCURRENCY = 3
+_IMAGE_SEND_TIMEOUT_SECONDS = 15
 
 SETU_COMMANDS: tuple[str, ...] = (
     "牛牛喵快逃",
@@ -53,19 +60,42 @@ async def _recall_all(group_id: int):
     """撤回该群最近由 bot 发送的所有图片"""
     global _recent_images
     bot = get_bot()
-    recalled = 0
 
-    for item in list(_recent_images):
-        if item["group_id"] == group_id:
-            try:
-                await bot.delete_msg(message_id=item["message_id"])
-                recalled += 1
-            except Exception as e:
-                print(f"[setu] recall error for msg {item['message_id']}: {e}")
+    async with _recall_lock:
+        targets = [item for item in _recent_images if item["group_id"] == group_id]
+        # 先摘出本次任务，避免并发的重复命令同时撤回同一批消息。
+        _recent_images = [item for item in _recent_images if item["group_id"] != group_id]
+        semaphore = asyncio.Semaphore(_RECALL_CONCURRENCY)
 
-    # 清理已撤回的记录
-    _recent_images = [r for r in _recent_images if r["group_id"] != group_id]
-    return recalled
+        async def recall_one(item: dict) -> bool:
+            async with semaphore:
+                try:
+                    await asyncio.wait_for(
+                        bot.delete_msg(message_id=item["message_id"]),
+                        timeout=_RECALL_TIMEOUT_SECONDS,
+                    )
+                    return True
+                except Exception as e:
+                    print(f"[setu] recall error for msg {item['message_id']}: {e}")
+                    return False
+
+        results = await asyncio.gather(*(recall_one(item) for item in targets))
+        recalled = sum(results)
+        failed = len(results) - recalled
+        return recalled, failed
+
+
+async def _send_notice(bot, group_id: int, message: str) -> None:
+    """发送进度或结果，避免通知 API 无限等待。"""
+    try:
+        await asyncio.wait_for(
+            bot.send_group_msg(group_id=group_id, message=message),
+            # NapCat's QQ sendMsg request currently times out after about 12s.
+            # Let its own error return before cancelling the OneBot API call.
+            timeout=_NOTICE_TIMEOUT_SECONDS,
+        )
+    except Exception as e:
+        print(f"[setu] notice error: {e}")
 
 
 @setu.handle()
@@ -73,30 +103,45 @@ async def _(event: GroupMessageEvent):
     global _recent_images
     group_id = event.group_id
     text = event.get_plaintext().strip()
-    files = _list_setu()
 
     # ── 牛牛喵快逃：撤回所有图片 ──
     if text == "牛牛喵快逃":
-        if not _recent_images:
-            await setu.finish("没有要撤回的图片喵~")
-        n = await _recall_all(group_id)
-        await setu.finish(f"🏃‍♀️ 撤回了 {n} 张图！溜了溜了")
+        bot = get_bot()
+        waiting_for_batch = _image_batch_lock.locked()
+        if waiting_for_batch:
+            await _send_notice(bot, group_id, "收到，当前这批图发完后马上撤回…")
+
+        async with _image_batch_lock:
+            pending_count = sum(item["group_id"] == group_id for item in _recent_images)
+            if not pending_count:
+                await _send_notice(bot, group_id, "没有要撤回的图片喵~")
+                await setu.finish()
+
+            if not waiting_for_batch:
+                await _send_notice(bot, group_id, f"收到，正在撤回 {pending_count} 张图…")
+            recalled, failed = await _recall_all(group_id)
+            if failed:
+                result = f"🏃‍♀️ 已撤回 {recalled} 张，{failed} 张撤回失败。"
+            else:
+                result = f"🏃‍♀️ 撤回了 {recalled} 张图！溜了溜了"
+            await _send_notice(bot, group_id, result)
+        await setu.finish()
         return
 
-    # ── 没有 setu 文件 ──
-    if not files:
-        return  # 静默，让 ai_chat 正常处理
-
-    count = 0
-
-    if text == "来点色图":
-        count = 1
-    elif text == "三连冲":
-        count = 3
-    elif text == "五连冲":
-        count = 5
-    else:
+    count = {
+        "来点色图": 1,
+        "三连冲": 3,
+        "五连冲": 5,
+    }.get(text, 0)
+    if not count:
         return  # 不匹配，让 ai_chat 处理
+
+    print(f"[setu] command received: group={group_id}, command={text!r}")
+
+    files = _list_setu()
+    if not files:
+        await setu.finish("图库里还没有图片喵，先把图片放进 data/setu/ 吧。")
+        return
 
     # 选图
     picked = _random_setu(count)
@@ -107,29 +152,43 @@ async def _(event: GroupMessageEvent):
 
     # 发送图片
     bot = get_bot()
-    sent_count = 0
-    for fp in picked:
-        try:
-            result = await bot.send_group_msg(
-                group_id=group_id,
-                message=_file_to_segment(fp),
+    if count > 1:
+        if _image_batch_lock.locked():
+            notice = f"收到，前一批还在发送；这批 {len(picked)} 张已排队…"
+        else:
+            notice = f"收到，开始发送 {len(picked)} 张图…"
+        await _send_notice(bot, group_id, notice)
+
+    async with _image_batch_lock:
+        sent_count = 0
+        for fp in picked:
+            try:
+                result = await asyncio.wait_for(
+                    bot.send_group_msg(
+                        group_id=group_id,
+                        message=_file_to_segment(fp),
+                    ),
+                    timeout=_IMAGE_SEND_TIMEOUT_SECONDS,
+                )
+                # send_group_msg 返回 {"message_id": 12345}，取实际 id
+                msg_id = result.get("message_id", 0) if isinstance(result, dict) else result
+                _recent_images.append({
+                    "group_id": group_id,
+                    "message_id": int(msg_id),
+                })
+                sent_count += 1
+            except Exception as e:
+                print(f"[setu] send error for {os.path.basename(fp)}: {type(e).__name__}: {e}")
+
+        # 限制撤回列表最多保留 50 条
+        if len(_recent_images) > 50:
+            _recent_images = _recent_images[-50:]
+
+        if sent_count > 0 and count > 1:
+            await _send_notice(
+                bot,
+                group_id,
+                f"已发送 {sent_count} 张 {random.choice(['涩图', '好图', '美图', '图图'])}~",
             )
-            # send_group_msg 返回 {"message_id": 12345}，取实际 id
-            msg_id = result.get("message_id", 0) if isinstance(result, dict) else result
-            _recent_images.append({
-                "group_id": group_id,
-                "message_id": int(msg_id),
-            })
-            sent_count += 1
-        except Exception as e:
-            print(f"[setu] send error: {e}")
-
-    # 限制撤回列表最多保留 50 条
-    if len(_recent_images) > 50:
-        _recent_images = _recent_images[-50:]
-
-    if sent_count > 0 and count > 1:
-        await bot.send_group_msg(
-            group_id=group_id,
-            message=f"已发送 {sent_count} 张 {random.choice(['涩图', '好图', '美图', '图图'])}~",
-        )
+        elif sent_count == 0:
+            await _send_notice(bot, group_id, "图片没能发出去，可能是 QQ 发图接口超时了，稍后再试喵。")

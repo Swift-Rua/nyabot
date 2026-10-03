@@ -87,15 +87,39 @@ nyabot 是基于 NoneBot2 + OneBot v11 的 QQ 群聊机器人，主打 AI 对话
 
 ## 三、项目建议配置（安全与运行）
 
-- 运行前先确认环境变量：
-  - `DEEPSEEK_API_KEY`
-  - `DEEPSEEK_BASE_URL`
-  - `MODEL`
-  - `GROUP_ID`（可选，影响启动/退出通知）
-- 生产环境建议不要让 `.env` 长期存放真实密钥。
-- `nb run` 为启动入口（依赖 OneBot/NapCat 连接地址：`ws://127.0.0.1:8080/onebot/v11/ws`）。
+- 运行前在 `.env` 配置 OneBot 连接参数；`GROUP_ID` 可选，影响启动/退出通知。
+- Windows 启动入口为 `python bot.py`；机器人会在本机 `127.0.0.1:8080` 等待 OneBot/NapCat 反向 WebSocket 连接，地址为 `ws://127.0.0.1:8080/onebot/v11/ws`。
 
-## 四、文档核验记录
+## 四、使用 ChatGPT 订阅额度
+
+聊天回复、群事件摘要和成员印象更新都通过 ChatGPT 的 Responses API 发起。首次启动前，在项目目录执行：
+
+```powershell
+& "$env:LOCALAPPDATA\Programs\Python\Python312\python.exe" -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -e .
+.\.venv\Scripts\python.exe -m services.chatgpt_auth login
+```
+
+命令会打开浏览器，让你登录 ChatGPT 并确认 Nyabot 使用订阅额度。完成后可查看连接状态和账号可用模型：
+
+```powershell
+.\.venv\Scripts\python.exe -m services.chatgpt_auth status
+.\.venv\Scripts\python.exe -m services.chatgpt_auth models
+```
+
+然后启动机器人：
+
+```powershell
+.\.venv\Scripts\python.exe bot.py
+```
+
+默认使用账号模型列表中的第一个模型。需要指定模型时，把 `.env` 中的 `CHATGPT_MODEL` 设为 `models` 命令显示的模型 slug。OAuth 凭据保存在 Windows 凭据管理器；项目里的 `data/chatgpt_auth.json` 只保存账号与授权状态，不含访问令牌。
+
+如果遇到订阅使用限额，机器人会暂停新的模型请求。先到 ChatGPT 设置的 Usage 页面查看额度，再手动执行 `.venv\Scripts\python.exe -m services.chatgpt_auth resume` 恢复。Plus 账号的五小时使用额度会在 ChatGPT 和所有使用该订阅授权的应用间共享；群聊不会各自获得独立额度。退出并清除本机令牌可执行 `.venv\Scripts\python.exe -m services.chatgpt_auth logout`。
+
+旧版本配置的 `DEEPSEEK_API_KEY`、`DEEPSEEK_BASE_URL` 和 `MODEL` 不再用于模型调用。如果真实密钥曾经提交到 Git 或发给他人，请轮换该密钥。
+
+## 五、文档核验记录
 
 - 已核验文档：
   - [CLAUDE.md](/C:/QQBot/nyabot/CLAUDE.md)

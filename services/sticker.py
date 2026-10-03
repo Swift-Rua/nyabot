@@ -263,8 +263,8 @@ async def collect_from_event(event, sender_name: str):
                             "url": url,
                             "sha256": content_hash,
                         })
-                        if len(data["stickers"]) > 500:
-                            data["stickers"] = data["stickers"][-500:]
+                        if len(data["stickers"]) > 1000:
+                            data["stickers"] = data["stickers"][-1000:]
                         save_index(data)
                         print(f"[sticker] collected from {sender_name}: {filename} ({len(content)}B)")
                     else:

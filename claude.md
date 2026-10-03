@@ -148,7 +148,7 @@
 ## 8. 运行入口
 ```bash
 cd nyabot
-nb run
+.venv/Scripts/python.exe bot.py
 ```
 
 ---

@@ -6,24 +6,13 @@ import os
 import time
 from datetime import datetime
 
-from openai import OpenAI
-from dotenv import load_dotenv
-
 from services.context_compressor import compress, get_group_ids
+from services.chatgpt_api import generate_text
 from plugins.summon import group_state
 
 
-load_dotenv()
-
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 EVENTS_FILE = os.path.join(BASE_DIR, "data", "group_events.json")
-
-_client = OpenAI(
-    api_key=os.getenv("DEEPSEEK_API_KEY"),
-    base_url=os.getenv("DEEPSEEK_BASE_URL"),
-    timeout=10.0,
-    max_retries=0,
-)
 
 SUMMARY_PROMPT = """You are summarizing recent group history.
 Output 3-6 concise bullet points, mentioning key topics and emotional tone."""
@@ -76,25 +65,15 @@ async def generate_summary(group_id: str):
         return
 
     try:
-        def _request_sync():
-            return _client.chat.completions.create(
-                model=os.getenv("MODEL", "deepseek-chat"),
-                messages=[
-                    {"role": "system", "content": SUMMARY_PROMPT},
-                    {"role": "user", "content": f"Recent group context:\n{ctx}"},
-                ],
-                temperature=0.5,
-                max_tokens=300,
-            )
-
-        response = await asyncio.wait_for(asyncio.to_thread(_request_sync), timeout=8)
+        text = await asyncio.wait_for(
+            generate_text(SUMMARY_PROMPT, f"Recent group context:\n{ctx}"),
+            timeout=55,
+        )
     except asyncio.TimeoutError:
         print("[events] generate_summary timeout")
         return
-    try:
-        text = response.choices[0].message.content or ""
     except Exception as e:
-        print(f"[events] AI error: {e}")
+        print(f"[events] ChatGPT error: {e}")
         return
 
     items = []
