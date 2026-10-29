@@ -16,6 +16,9 @@ from plugins.summon import (
     group_last_active,
     group_state,
     group_voice_mode,
+    is_group_muted as _is_group_muted,
+    mute_group,
+    unmute_group,
 )
 from services.ai_gate import AIGate
 from services.context_compressor import record_message
@@ -63,7 +66,6 @@ PERSONA_RETRY_HINT = "You are not AI. Reply again as a normal group friend, do n
 gate = AIGate(cooldown=5.0, reply_prob=DEFAULT_REPLY_PROB)
 updater = ProfileUpdater()
 
-_GROUP_MUTE_UNTIL: dict[str, float] = {}
 _FOLLOWUP_REPLY_LEFT: dict[str, int] = {}
 
 
@@ -142,16 +144,6 @@ def _get_name(user_id: str) -> str:
     if user:
         return _normalize_text(user.get("name")) or f"User{user_id}"
     return f"User{user_id}"
-
-
-def _is_group_muted(group_id: str) -> bool:
-    until = _GROUP_MUTE_UNTIL.get(group_id)
-    if not until:
-        return False
-    if time.time() >= until:
-        _GROUP_MUTE_UNTIL.pop(group_id, None)
-        return False
-    return True
 
 
 def _has_call_keyword(text: str) -> bool:
@@ -311,8 +303,11 @@ def _extract_reply_user(event: GroupMessageEvent) -> str | None:
     return None
 
 
-async def _send_text_or_voice(group_id: str, text: str):
+async def _send_text_or_voice(group_id: str, text: str, *, allow_when_muted: bool = False):
     from services.tts import send_voice_reply
+
+    if _is_group_muted(group_id) and not allow_when_muted:
+        return
 
     if group_voice_mode.get(group_id, False):
         try:
@@ -375,7 +370,11 @@ def _build_typing_chunks(text: str) -> list[str]:
     return chunks[:4] or [text]
 
 
-async def _send_reply(group_id: str, text: str, event, *, typing_habit: bool = False, auto_sticker: bool = True):
+async def _send_reply(group_id: str, text: str, event, *, typing_habit: bool = False, auto_sticker: bool = True, allow_when_muted: bool = False):
+    if _is_group_muted(group_id) and not allow_when_muted:
+        return
+
+    print(f"[chat] sending reply: group={group_id}, message={getattr(event, 'message_id', None)}, chars={len(text or '')}")
     st_info = sticker_detect(event)
     if st_info.get("has_sticker") and not event.get_plaintext().strip():
         sticker_seg = reply_to_sticker(event)
@@ -387,16 +386,18 @@ async def _send_reply(group_id: str, text: str, event, *, typing_habit: bool = F
                 )
             except ActionFailed as e:
                 print(f"[chat] send sticker failed (ActionFailed), group={group_id}, message={e}")
-                await _send_text_or_voice(group_id, text)
+                await _send_text_or_voice(group_id, text, allow_when_muted=allow_when_muted)
             except Exception as e:
                 print(f"[chat] send sticker failed, group={group_id}, error={type(e).__name__}: {e}")
-                await _send_text_or_voice(group_id, text)
+                await _send_text_or_voice(group_id, text, allow_when_muted=allow_when_muted)
             return
 
     if typing_habit and not group_voice_mode.get(group_id, False) and random.random() < TYPING_HABIT_PROBABILITY:
         chunks = _build_typing_chunks(text)
         if len(chunks) > 1:
             for i, chunk in enumerate(chunks):
+                if _is_group_muted(group_id) and not allow_when_muted:
+                    return
                 try:
                     await asyncio.wait_for(
                         get_bot().send_group_msg(group_id=int(group_id), message=chunk),
@@ -415,27 +416,30 @@ async def _send_reply(group_id: str, text: str, event, *, typing_habit: bool = F
                 return
 
             # fallback to last attempt for full text
-            await _send_text_or_voice(group_id, text)
+            await _send_text_or_voice(group_id, text, allow_when_muted=allow_when_muted)
             return
 
     if auto_sticker and random.random() < 0.5:
         sticker_segment, _ = reply_with_sticker()
         if sticker_segment and not group_voice_mode.get(group_id, False):
-            full_msg = MessageSegment.text(text) + sticker_segment
+            await _send_text_or_voice(group_id, text, allow_when_muted=allow_when_muted)
+            if _is_group_muted(group_id) and not allow_when_muted:
+                return
+            sticker_started = time.monotonic()
+            print(f"[chat] sending extra sticker: group={group_id}, type={sticker_segment.type}")
             try:
                 await asyncio.wait_for(
-                    get_bot().send_group_msg(group_id=int(group_id), message=full_msg),
+                    get_bot().send_group_msg(group_id=int(group_id), message=sticker_segment),
                     timeout=_BOT_API_TIMEOUT,
                 )
+                print(f"[chat] extra sticker sent: group={group_id}, elapsed={time.monotonic() - sticker_started:.1f}s")
             except ActionFailed as e:
-                print(f"[chat] send sticker+text failed (ActionFailed), group={group_id}, message={e}")
-                await _send_text_or_voice(group_id, text)
+                print(f"[chat] extra sticker failed (ActionFailed): group={group_id}, elapsed={time.monotonic() - sticker_started:.1f}s, message={e}")
             except Exception as e:
-                print(f"[chat] send sticker+text failed, group={group_id}, error={type(e).__name__}: {e}")
-                await _send_text_or_voice(group_id, text)
+                print(f"[chat] extra sticker failed: group={group_id}, elapsed={time.monotonic() - sticker_started:.1f}s, error={type(e).__name__}: {e}")
             return
 
-    await _send_text_or_voice(group_id, text)
+    await _send_text_or_voice(group_id, text, allow_when_muted=allow_when_muted)
 
 
 def _is_control_command(text: str) -> bool:
@@ -474,6 +478,18 @@ def _is_bot_mentioned(event, at_ids: list[str], text: str) -> bool:
 async def _(event: GroupMessageEvent):
     group_id = str(event.group_id)
     user_id = str(event.user_id)
+
+    # Handle control text before mention/face decoration and slow profile work.
+    command = event.get_plaintext().strip()
+    if command in {MUTE_CMD, "bot mute 12h"}:
+        mute_group(group_id, SILENT_DURATION_SECONDS)
+        _FOLLOWUP_REPLY_LEFT.pop(group_id, None)
+        await chat.finish("好，我会安静12小时喵，不会主动说话。")
+
+    if command == UNMUTE_CMD:
+        unmute_group(group_id)
+        _FOLLOWUP_REPLY_LEFT.pop(group_id, None)
+        await chat.finish("喵喵回来了，解除12小时静音。")
 
     check_auto(group_id)
 
@@ -546,28 +562,13 @@ async def _(event: GroupMessageEvent):
     if _is_control_command(text):
         return
 
-    if text == "bot mute 12h":
-        _GROUP_MUTE_UNTIL[group_id] = time.time() + SILENT_DURATION_SECONDS
-        _FOLLOWUP_REPLY_LEFT.pop(group_id, None)
-        await chat.finish("Got it. I will stay quiet for 12h.")
-
-    if text == MUTE_CMD:
-        _GROUP_MUTE_UNTIL[group_id] = time.time() + SILENT_DURATION_SECONDS
-        _FOLLOWUP_REPLY_LEFT.pop(group_id, None)
-        await chat.finish("好，我会安静12小时喵，不会主动说话。")
-
-    if text == UNMUTE_CMD:
-        _GROUP_MUTE_UNTIL.pop(group_id, None)
-        _FOLLOWUP_REPLY_LEFT.pop(group_id, None)
-        await chat.finish("喵喵回来了，解除12小时静音。")
-
     if text == "bot reply 10%":
         gate.set_group_reply_prob(group_id, 0.10)
         await chat.finish("Reply probability set to 10%.")
 
     if text == "bot reply default":
         gate.reset_group_reply_prob(group_id)
-        _GROUP_MUTE_UNTIL.pop(group_id, None)
+        unmute_group(group_id)
         await chat.finish("Reply probability restored to default.")
 
     mentioned_ids = list(set(at_ids + resolve_mentions(text)))
@@ -579,7 +580,13 @@ async def _(event: GroupMessageEvent):
         from services.relation import record as record_relation
         await record_relation(user_id, list(relation_targets), group_id, replied_user_id=reply_user)
 
-    if group_state.get(group_id, False):
+    bot_at_mentioned = _is_bot_mentioned(event, at_ids, text)
+    force_reply = _has_call_keyword(text) or ("meow" in text.lower()) or bot_at_mentioned
+
+    if _is_group_muted(group_id) and not force_reply:
+        return
+
+    if group_state.get(group_id, False) and not _is_group_muted(group_id):
         group_last_active[group_id] = time.time()
         update_mood(text)
         mood = get_mood()
@@ -595,19 +602,13 @@ async def _(event: GroupMessageEvent):
         )
         await chat.finish()
 
-    bot_at_mentioned = _is_bot_mentioned(event, at_ids, text)
-    force_reply = _has_call_keyword(text) or ("meow" in text.lower()) or bot_at_mentioned
-
-    if _is_group_muted(group_id) and not force_reply:
-        return
-
     followup_left = _FOLLOWUP_REPLY_LEFT.get(group_id, 0)
     should_reply = force_reply or followup_left > 0
     if not should_reply:
         should_reply = gate.should_reply(group_id, user_id, text, force_reply=False)
 
     if should_reply:
-        if force_reply:
+        if force_reply and not _is_group_muted(group_id):
             _FOLLOWUP_REPLY_LEFT[group_id] = 1
         elif followup_left > 0:
             if followup_left <= 1:
@@ -626,6 +627,7 @@ async def _(event: GroupMessageEvent):
             event,
             typing_habit=False if used_no_token else True,
             auto_sticker=not used_no_token,
+            allow_when_muted=force_reply,
         )
         await chat.finish()
     else:

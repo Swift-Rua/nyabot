@@ -8,7 +8,7 @@ import asyncio
 
 from nonebot import get_bot
 
-from plugins.summon import group_state, group_last_active, check_auto, group_voice_mode
+from plugins.summon import group_state, group_last_active, check_auto, group_voice_mode, is_group_muted
 from services.data_store import get_users_sync, update_affinity, ensure_user, get_affinity, ensure_member_in_group, ensure_group_meta
 from services.deepseek_client import ask_ai
 from services.tts import send_voice_reply
@@ -156,7 +156,7 @@ async def try_proactive_say(group_id: str):
     group_id = str(group_id)
 
     # 未召唤时不发言
-    if not group_state.get(group_id, False):
+    if not group_state.get(group_id, False) or is_group_muted(group_id):
         return
 
     # 群很活跃时不插话
@@ -191,7 +191,8 @@ async def try_proactive_say(group_id: str):
         print(f"[proactive] AI error: {e}")
         return
 
-    if not reply:
+    # A mute/leave command may arrive while the model request is pending.
+    if not reply or not group_state.get(group_id, False) or is_group_muted(group_id):
         return
 
     try:

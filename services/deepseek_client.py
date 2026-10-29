@@ -4,6 +4,7 @@ AI 客户端：统一上下文构建 + ChatGPT 订阅 API 调用。
 """
 import random
 import asyncio
+import time
 
 from services.context_compressor import compress as compress_context
 from services.chatgpt_api import (
@@ -277,16 +278,19 @@ async def ask_ai(
     name_prefix = f"[{sender_name}]" if sender_name else ""
     user_content = f"{name_prefix}: {message}" if name_prefix else message
 
+    request_started = time.monotonic()
+    print(f"[AI] request started: group={group_id}, user={user_id}")
     try:
         reply = await asyncio.wait_for(
             generate_text(system_content, user_content),
             timeout=55,
         )
         _set_ai_status("ok")
+        print(f"[AI] request completed: group={group_id}, user={user_id}, elapsed={time.monotonic() - request_started:.1f}s, chars={len(reply or '')}")
         return reply or _fallback_reply()
     except asyncio.TimeoutError:
         _set_ai_status("error")
-        print("[AI] ChatGPT request timed out")
+        print(f"[AI] ChatGPT request timed out: group={group_id}, user={user_id}, elapsed={time.monotonic() - request_started:.1f}s")
         return _fallback_reply()
     except Exception as e:
         _set_ai_status(_classify_ai_error(e))

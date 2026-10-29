@@ -157,7 +157,8 @@ def _save_state(state: dict) -> None:
                 pass
 
 
-def _append_pending(group_id: str, event_type: str, text: str, meta: dict | None = None) -> None:
+def _append_pending_to_state(state: dict, group_id: str, event_type: str, text: str, meta: dict | None = None) -> None:
+    """Append to the caller's state while it already holds _STATE_LOCK."""
     gid = _normalize_group_id(group_id)
     if not gid:
         return
@@ -166,23 +167,20 @@ def _append_pending(group_id: str, event_type: str, text: str, meta: dict | None
     if not text:
         return
 
+    pending = state.setdefault("pending_events", {})
+    queue = pending.setdefault(gid, [])
+
+    if queue and queue[-1].get("text") == text:
+        return
+
+    queue.append({"time": time.time(), "type": _normalize_text(event_type) or "event", "text": text, "meta": meta or {}})
+    state["pending_events"][gid] = queue[-_PENDING_LIMIT_PER_GROUP:]
+
+
+def _append_pending(group_id: str, event_type: str, text: str, meta: dict | None = None) -> None:
     with _STATE_LOCK:
         state = _load_state()
-        pending = state.setdefault("pending_events", {})
-        queue = pending.setdefault(gid, [])
-
-        if queue and queue[-1].get("text") == text:
-            return
-
-        queue.append(
-            {
-                "time": time.time(),
-                "type": _normalize_text(event_type) or "event",
-                "text": text,
-                "meta": meta or {},
-            }
-        )
-        state["pending_events"][gid] = queue[-_PENDING_LIMIT_PER_GROUP:]
+        _append_pending_to_state(state, group_id, event_type, text, meta)
         _save_state(state)
 
 
@@ -249,14 +247,14 @@ def _maybe_record_streak(group_id: str, user_id: str, user_name: str) -> None:
             "count": count,
             "last_seen": now,
         }
-        _save_state(state)
-
         if count == _CONSECUTIVE_THRESHOLD:
-            _append_pending(
+            _append_pending_to_state(
+                state,
                 gid,
                 "streak",
                 f"{name}({uid}) sent {count} messages in a row.",
             )
+        _save_state(state)
 
 
 def _maybe_record_message_milestone(
@@ -302,7 +300,8 @@ def _maybe_record_message_milestone(
         for milestone in _MESSAGE_MILESTONES:
             if count >= milestone and milestone not in seen:
                 seen.add(milestone)
-                _append_pending(
+                _append_pending_to_state(
+                    state,
                     gid,
                     "milestone",
                     f"{name}({uid}) reached {milestone} messages.",

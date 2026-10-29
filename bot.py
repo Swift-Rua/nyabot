@@ -4,6 +4,10 @@ import os
 import sys
 import time
 
+if __name__ == "__main__" and "--worker" not in sys.argv:
+    from services.supervisor import run
+    raise SystemExit(run())
+
 # The default Windows console code page is often GBK.  NoneBot logs raw group
 # messages, so an emoji can otherwise make Loguru fail while writing the log.
 for _stream in (sys.stdout, sys.stderr):
@@ -189,7 +193,10 @@ async def on_bot_disconnect(bot):
 
 @driver.on_startup
 async def on_start():
-    pass
+    from services.process_health import heartbeat_loop
+    task = asyncio.create_task(heartbeat_loop())
+    _BACKGROUND_TASKS.add(task)
+    task.add_done_callback(_BACKGROUND_TASKS.discard)
 
 
 @driver.on_shutdown

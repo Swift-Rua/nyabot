@@ -88,7 +88,11 @@ nyabot 是基于 NoneBot2 + OneBot v11 的 QQ 群聊机器人，主打 AI 对话
 ## 三、项目建议配置（安全与运行）
 
 - 运行前在 `.env` 配置 OneBot 连接参数；`GROUP_ID` 可选，影响启动/退出通知。
-- Windows 启动入口为 `python bot.py`；机器人会在本机 `127.0.0.1:8080` 等待 OneBot/NapCat 反向 WebSocket 连接，地址为 `ws://127.0.0.1:8080/onebot/v11/ws`。
+- Windows 启动入口为 `python bot.py`；当前本机配置使用 `127.0.0.1:8081` 等待 OneBot/NapCat 反向 WebSocket 连接，地址为 `ws://127.0.0.1:8081/onebot/v11/ws`。端口由 `.env` 的 `PORT` 指定，修改时需同步 NapCat 的反向 WebSocket 地址。
+
+启动命令保持不变，`bot.py` 会运行独立看门狗，再启动机器人子进程。事件循环每 2 秒更新一次心跳；连续 60 秒停止更新时保存线程堆栈，75 秒后强制结束该子进程并重启。启动超过 120 秒无心跳或异常退出也会自动重启，反复失败时逐步延长重试间隔，最多 60 秒。正常的异步 GPT 请求不会阻止心跳。
+
+机器人输出写入 `data/bot_runtime.log`，看门狗记录写入 `data/supervisor.log`，卡死堆栈写入 `data/hang-*.log`。PowerShell 可执行 `Get-Content .\data\bot_runtime.log -Tail 40 -Wait` 查看运行日志。按 `Ctrl+C` 可停止看门狗及其子进程；后台运行时可执行 `.\.venv\Scripts\python.exe bot.py --stop` 停止。重复启动会被拒绝。看门狗只重启自己的机器人子进程，QQ/NapCat 发图超时仍需通过发送日志另行排查。
 
 ## 四、使用 ChatGPT 订阅额度
 

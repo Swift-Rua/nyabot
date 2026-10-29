@@ -5,6 +5,7 @@ import os
 import random
 import glob
 import asyncio
+import time
 
 from nonebot import on_message, get_bot
 from nonebot.adapters.onebot.v11 import GroupMessageEvent, MessageSegment
@@ -162,6 +163,8 @@ async def _(event: GroupMessageEvent):
     async with _image_batch_lock:
         sent_count = 0
         for fp in picked:
+            started = time.monotonic()
+            print(f"[setu] sending image: group={group_id}, file={os.path.basename(fp)}")
             try:
                 result = await asyncio.wait_for(
                     bot.send_group_msg(
@@ -177,8 +180,12 @@ async def _(event: GroupMessageEvent):
                     "message_id": int(msg_id),
                 })
                 sent_count += 1
+                print(f"[setu] image sent: group={group_id}, message={msg_id}, elapsed={time.monotonic() - started:.1f}s")
             except Exception as e:
-                print(f"[setu] send error for {os.path.basename(fp)}: {type(e).__name__}: {e}")
+                print(f"[setu] send error for {os.path.basename(fp)}: group={group_id}, elapsed={time.monotonic() - started:.1f}s, {type(e).__name__}: {e}")
+                # Cancelling OneBot does not cancel QQ's pending upload. Stop
+                # this batch instead of piling more uploads onto a stuck send.
+                break
 
         # 限制撤回列表最多保留 50 条
         if len(_recent_images) > 50:

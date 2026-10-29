@@ -19,6 +19,9 @@ group_last_active: dict[str, float] = {}
 # { group_id: bool }  默认 False = 文字模式
 group_voice_mode: dict[str, bool] = {}
 
+# Shared by chat and proactive replies so every automatic path observes mute.
+_group_mute_until: dict[str, float] = {}
+
 SUMMON_COMMANDS: tuple[str, ...] = (
     "牛牛喵召唤术！",
     "牛牛喵归来！",
@@ -43,6 +46,25 @@ def deactivate(group_id: str):
     group_state.pop(group_id, None)
     group_start_time.pop(group_id, None)
     group_last_active.pop(group_id, None)
+
+
+def mute_group(group_id: str, duration: float):
+    _group_mute_until[group_id] = time.time() + duration
+    deactivate(group_id)
+
+
+def unmute_group(group_id: str):
+    _group_mute_until.pop(group_id, None)
+
+
+def is_group_muted(group_id: str) -> bool:
+    until = _group_mute_until.get(group_id)
+    if until is None:
+        return False
+    if time.time() >= until:
+        unmute_group(group_id)
+        return False
+    return True
 
 
 def check_auto(group_id: str):
